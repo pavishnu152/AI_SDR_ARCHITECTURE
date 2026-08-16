@@ -34,9 +34,24 @@ class Settings(BaseSettings):
     # --- ICP ---
     icp_config_path: str = "configs/icp_ai_native_b2b.yaml"
 
+    # --- CORS ---
+    # Comma-separated origins the frontend dashboard is served from. Defaults
+    # cover Vite's dev server (5173) and its production preview server
+    # (4173) — the two ports frontend/ actually runs on locally. An
+    # explicit allow-list instead of "*" is still the right default even
+    # though this API uses bearer tokens (not cookies, so "*" wouldn't be a
+    # CSRF issue here specifically) — it's the pattern that stays correct
+    # if auth ever moves to cookies later, and it's what you'd be expected
+    # to already have in a real deployment.
+    cors_allowed_origins: str = "http://localhost:5173,http://localhost:4173"
+
     @property
     def is_production(self) -> bool:
         return self.app_env.lower() == "production"
+
+    @property
+    def cors_allowed_origins_list(self) -> list[str]:
+        return [origin.strip() for origin in self.cors_allowed_origins.split(",") if origin.strip()]
 
 
 @lru_cache

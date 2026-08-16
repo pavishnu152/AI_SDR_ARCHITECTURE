@@ -1,0 +1,185 @@
+<svg viewBox="0 0 1180 900" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4b5563"/>
+    </marker>
+    <marker id="arrowRed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#c0392b"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1180" height="900" fill="#ffffff"/>
+
+  <text x="590" y="34" text-anchor="middle" font-size="20" font-weight="700" fill="#111827">AI SDR — Multi-Agent Lead Research &amp; Qualification</text>
+  <text x="590" y="55" text-anchor="middle" font-size="12.5" fill="#6b7280">Client → API → LangGraph orchestrator → 4 agents → Postgres, with full per-call audit logging</text>
+
+  <!-- Frontend -->
+  <rect x="40" y="80" width="200" height="60" rx="8" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
+  <text x="140" y="105" text-anchor="middle" font-size="13" font-weight="600" fill="#312e81">React Dashboard</text>
+  <text x="140" y="122" text-anchor="middle" font-size="10.5" fill="#4338ca">Vite + TS · JWT bearer auth</text>
+
+  <!-- API -->
+  <rect x="40" y="180" width="200" height="70" rx="8" fill="#ecfdf5" stroke="#10b981" stroke-width="1.5"/>
+  <text x="140" y="203" text-anchor="middle" font-size="13" font-weight="600" fill="#065f46">FastAPI</text>
+  <text x="140" y="219" text-anchor="middle" font-size="10.5" fill="#047857">/auth · /leads · /leads/:id/logs</text>
+  <text x="140" y="234" text-anchor="middle" font-size="10.5" fill="#047857">OAuth2PasswordBearer + JWT</text>
+
+  <line x1="140" y1="140" x2="140" y2="180" stroke="#4b5563" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- lead_service -->
+  <rect x="40" y="290" width="200" height="55" rx="8" fill="#fff7ed" stroke="#f97316" stroke-width="1.5"/>
+  <text x="140" y="312" text-anchor="middle" font-size="12.5" font-weight="600" fill="#9a3412">lead_service.py</text>
+  <text x="140" y="328" text-anchor="middle" font-size="10.5" fill="#c2410c">PipelineResult → DB rows</text>
+
+  <line x1="140" y1="250" x2="140" y2="290" stroke="#4b5563" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Orchestrator box -->
+  <rect x="330" y="80" width="560" height="420" rx="10" fill="#f9fafb" stroke="#9ca3af" stroke-width="1.3" stroke-dasharray="4 3"/>
+  <text x="610" y="102" text-anchor="middle" font-size="12.5" font-weight="700" fill="#374151">Orchestrator (LangGraph StateGraph, compiled once at import)</text>
+
+  <line x1="240" y1="317" x2="330" y2="220" stroke="#4b5563" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Research agent -->
+  <rect x="360" y="130" width="150" height="60" rx="8" fill="#eff6ff" stroke="#3b82f6" stroke-width="1.5"/>
+  <text x="435" y="153" text-anchor="middle" font-size="12" font-weight="600" fill="#1e3a8a">Research Agent</text>
+  <text x="435" y="168" text-anchor="middle" font-size="10" fill="#1d4ed8">Haiku 4.5 · tool loop</text>
+  <text x="435" y="182" text-anchor="middle" font-size="9.5" fill="#1d4ed8">web_search · fetch_page</text>
+
+  <!-- Scoring agent -->
+  <rect x="560" y="130" width="150" height="60" rx="8" fill="#eff6ff" stroke="#3b82f6" stroke-width="1.5"/>
+  <text x="635" y="153" text-anchor="middle" font-size="12" font-weight="600" fill="#1e3a8a">Scoring Agent</text>
+  <text x="635" y="168" text-anchor="middle" font-size="10" fill="#1d4ed8">Haiku 4.5 · forced tool_choice</text>
+  <text x="635" y="182" text-anchor="middle" font-size="9.5" fill="#1d4ed8">ICP-weighted 0-100</text>
+
+  <line x1="510" y1="160" x2="560" y2="160" stroke="#4b5563" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Reject gate -->
+  <polygon points="635,215 700,245 635,275 570,245" fill="#fef2f2" stroke="#c0392b" stroke-width="1.5"/>
+  <text x="635" y="241" text-anchor="middle" font-size="10" font-weight="600" fill="#991b1b">score &lt;=</text>
+  <text x="635" y="253" text-anchor="middle" font-size="10" font-weight="600" fill="#991b1b">reject?</text>
+
+  <line x1="635" y1="190" x2="635" y2="215" stroke="#4b5563" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <rect x="720" y="230" width="140" height="34" rx="6" fill="#fef2f2" stroke="#c0392b" stroke-width="1.3"/>
+  <text x="790" y="252" text-anchor="middle" font-size="11" font-weight="600" fill="#991b1b">REJECTED (end)</text>
+  <line x1="700" y1="245" x2="720" y2="247" stroke="#c0392b" stroke-width="1.5" marker-end="url(#arrowRed)"/>
+  <text x="705" y="238" font-size="9.5" fill="#c0392b">yes</text>
+
+  <!-- Drafting agent -->
+  <rect x="560" y="300" width="150" height="60" rx="8" fill="#faf5ff" stroke="#8b5cf6" stroke-width="1.5"/>
+  <text x="635" y="323" text-anchor="middle" font-size="12" font-weight="600" fill="#4c1d95">Drafting Agent</text>
+  <text x="635" y="338" text-anchor="middle" font-size="10" fill="#6d28d9">Sonnet 5 · forced tool_choice</text>
+  <text x="635" y="352" text-anchor="middle" font-size="9.5" fill="#6d28d9">accepts guardrail_feedback</text>
+
+  <line x1="635" y1="275" x2="635" y2="300" stroke="#4b5563" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="645" y="290" font-size="9.5" fill="#374151">no</text>
+
+  <!-- Guardrail agent -->
+  <rect x="360" y="300" width="150" height="60" rx="8" fill="#fff1f2" stroke="#e11d48" stroke-width="1.5"/>
+  <text x="435" y="323" text-anchor="middle" font-size="12" font-weight="600" fill="#881337">Guardrail Agent</text>
+  <text x="435" y="338" text-anchor="middle" font-size="10" fill="#be123c">Sonnet 5 · fails closed</text>
+  <text x="435" y="352" text-anchor="middle" font-size="9.5" fill="#be123c">chain-of-verification</text>
+
+  <line x1="560" y1="330" x2="510" y2="330" stroke="#4b5563" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Approved gate -->
+  <polygon points="435,390 500,420 435,450 370,420" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.5"/>
+  <text x="435" y="416" text-anchor="middle" font-size="10" font-weight="600" fill="#14532d">approved?</text>
+
+  <line x1="435" y1="360" x2="435" y2="390" stroke="#4b5563" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <rect x="230" y="405" width="120" height="34" rx="6" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.3"/>
+  <text x="290" y="427" text-anchor="middle" font-size="11" font-weight="600" fill="#14532d">READY (end)</text>
+  <line x1="370" y1="420" x2="350" y2="420" stroke="#16a34a" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="352" y="412" font-size="9.5" fill="#16a34a">yes</text>
+
+  <!-- Revision loop back to drafting -->
+  <path d="M 470 445 C 530 460, 700 440, 700 360" fill="none" stroke="#c0392b" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#arrowRed)"/>
+  <text x="500" y="459" font-size="9" fill="#c0392b">no → revise once</text>
+  <text x="500" y="470" font-size="9" fill="#c0392b">(drafting_revision → guardrail_recheck)</text>
+
+  <rect x="860" y="405" width="130" height="34" rx="6" fill="#fffbeb" stroke="#d97706" stroke-width="1.3"/>
+  <text x="925" y="427" text-anchor="middle" font-size="10.5" font-weight="600" fill="#92400e">FLAGGED (end)</text>
+  <text x="750" y="400" font-size="9.5" fill="#92400e">recheck still rejects, or</text>
+  <text x="750" y="412" font-size="9.5" fill="#92400e">any node technically fails →</text>
+  <line x1="820" y1="410" x2="860" y2="418" stroke="#92400e" stroke-width="1.3" marker-end="url(#arrow)"/>
+
+  <!-- call_with_retry note -->
+  <text x="345" y="493" font-size="9" fill="#6b7280" font-style="italic">Every node wrapped in call_with_retry (manual — agents return Result objects, not exceptions, so LangGraph's built-in RetryPolicy wouldn't trigger)</text>
+
+  <!-- Anthropic API -->
+  <rect x="960" y="130" width="180" height="70" rx="8" fill="#1f2937"/>
+  <text x="1050" y="155" text-anchor="middle" font-size="12.5" font-weight="600" fill="#f9fafb">Anthropic Claude API</text>
+  <text x="1050" y="172" text-anchor="middle" font-size="10" fill="#d1d5db">Haiku 4.5 (research/score)</text>
+  <text x="1050" y="186" text-anchor="middle" font-size="10" fill="#d1d5db">Sonnet 5 (draft/guardrail)</text>
+
+  <line x1="710" y1="160" x2="960" y2="160" stroke="#4b5563" stroke-width="1.3" stroke-dasharray="3 2" marker-end="url(#arrow)"/>
+  <line x1="710" y1="330" x2="960" y2="180" stroke="#4b5563" stroke-width="1.3" stroke-dasharray="3 2" marker-end="url(#arrow)"/>
+  <line x1="510" y1="330" x2="380" y2="360" stroke="#4b5563" stroke-width="0" opacity="0"/>
+
+  <!-- Web -->
+  <rect x="960" y="230" width="180" height="55" rx="8" fill="#1f2937"/>
+  <text x="1050" y="253" text-anchor="middle" font-size="12" font-weight="600" fill="#f9fafb">Web (DuckDuckGo)</text>
+  <text x="1050" y="269" text-anchor="middle" font-size="10" fill="#d1d5db">ddgs search + page fetch</text>
+  <line x1="435" y1="130" x2="435" y2="115" stroke="#4b5563" stroke-width="0" opacity="0"/>
+  <path d="M 435 130 C 435 100, 950 100, 960 245" fill="none" stroke="#4b5563" stroke-width="1.3" stroke-dasharray="3 2" marker-end="url(#arrow)"/>
+
+  <!-- DB -->
+  <rect x="330" y="560" width="560" height="150" rx="10" fill="#f1f5f9" stroke="#64748b" stroke-width="1.5"/>
+  <text x="610" y="585" text-anchor="middle" font-size="13" font-weight="700" fill="#1e293b">PostgreSQL (SQLAlchemy 2.0 + Alembic)</text>
+
+  <rect x="350" y="600" width="100" height="40" rx="5" fill="#ffffff" stroke="#94a3b8"/>
+  <text x="400" y="624" text-anchor="middle" font-size="10" fill="#334155">Lead</text>
+
+  <rect x="465" y="600" width="100" height="40" rx="5" fill="#ffffff" stroke="#94a3b8"/>
+  <text x="515" y="619" text-anchor="middle" font-size="9.5" fill="#334155">LeadProfile</text>
+  <text x="515" y="631" text-anchor="middle" font-size="8.5" fill="#64748b">signals/sources</text>
+
+  <rect x="580" y="600" width="100" height="40" rx="5" fill="#ffffff" stroke="#94a3b8"/>
+  <text x="630" y="624" text-anchor="middle" font-size="10" fill="#334155">ScoreResult</text>
+
+  <rect x="695" y="600" width="105" height="40" rx="5" fill="#ffffff" stroke="#94a3b8"/>
+  <text x="747" y="619" text-anchor="middle" font-size="9.5" fill="#334155">OutreachDraft</text>
+  <text x="747" y="631" text-anchor="middle" font-size="8.5" fill="#64748b">+ guardrail verdict</text>
+
+  <rect x="465" y="655" width="330" height="48" rx="5" fill="#fefce8" stroke="#ca8a04"/>
+  <text x="630" y="670" text-anchor="middle" font-size="10" font-weight="600" fill="#713f12">AgentLog — append-only audit trail</text>
+  <text x="630" y="683" text-anchor="middle" font-size="8.5" fill="#854d0e">every attempt · latency · tokens · cost · success/error</text>
+  <text x="630" y="695" text-anchor="middle" font-size="8.5" fill="#854d0e">powers the dashboard's trace viewer</text>
+
+  <rect x="350" y="655" width="100" height="40" rx="5" fill="#ffffff" stroke="#94a3b8"/>
+  <text x="400" y="672" text-anchor="middle" font-size="10" fill="#334155">User</text>
+  <text x="400" y="684" text-anchor="middle" font-size="8.5" fill="#64748b">bcrypt hash</text>
+
+  <path d="M 140 345 C 140 600, 300 640, 330 640" fill="none" stroke="#4b5563" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="150" y="500" font-size="9.5" fill="#4b5563">lead_service persists</text>
+  <text x="150" y="512" font-size="9.5" fill="#4b5563">PipelineResult → 5 tables</text>
+
+  <!-- Eval harness -->
+  <rect x="40" y="600" width="200" height="80" rx="8" fill="#f5f3ff" stroke="#7c3aed" stroke-width="1.3"/>
+  <text x="140" y="623" text-anchor="middle" font-size="12" font-weight="600" fill="#4c1d95">Eval Harness</text>
+  <text x="140" y="638" text-anchor="middle" font-size="9.5" fill="#5b21b6">25 synthetic labeled leads</text>
+  <text x="140" y="651" text-anchor="middle" font-size="9.5" fill="#5b21b6">precision/recall/F1 per band</text>
+  <text x="140" y="664" text-anchor="middle" font-size="9.5" fill="#5b21b6">calls Scoring Agent directly</text>
+  <text x="140" y="676" text-anchor="middle" font-size="9.5" fill="#5b21b6">(bypasses API/orchestrator)</text>
+
+  <!-- Deploy row -->
+  <rect x="40" y="760" width="1100" height="110" rx="10" fill="#f9fafb" stroke="#d1d5db" stroke-width="1.3"/>
+  <text x="590" y="782" text-anchor="middle" font-size="12" font-weight="700" fill="#374151">Deployment</text>
+
+  <rect x="70" y="800" width="220" height="50" rx="6" fill="#ecfeff" stroke="#0891b2"/>
+  <text x="180" y="820" text-anchor="middle" font-size="10.5" font-weight="600" fill="#164e63">Docker (multi-stage build)</text>
+  <text x="180" y="835" text-anchor="middle" font-size="9.5" fill="#0e7490">non-root user, stdlib healthcheck</text>
+
+  <rect x="320" y="800" width="220" height="50" rx="6" fill="#ecfeff" stroke="#0891b2"/>
+  <text x="430" y="820" text-anchor="middle" font-size="10.5" font-weight="600" fill="#164e63">GitHub Actions CI</text>
+  <text x="430" y="835" text-anchor="middle" font-size="9.5" fill="#0e7490">ruff + pytest (cov≥85%) + docker build</text>
+
+  <rect x="570" y="800" width="220" height="50" rx="6" fill="#ecfeff" stroke="#0891b2"/>
+  <text x="680" y="820" text-anchor="middle" font-size="10.5" font-weight="600" fill="#164e63">Render Blueprint</text>
+  <text x="680" y="835" text-anchor="middle" font-size="9.5" fill="#0e7490">API + static dashboard + Postgres</text>
+
+  <rect x="820" y="800" width="220" height="50" rx="6" fill="#ecfeff" stroke="#0891b2"/>
+  <text x="930" y="820" text-anchor="middle" font-size="10.5" font-weight="600" fill="#164e63">Alembic migrations</text>
+  <text x="930" y="835" text-anchor="middle" font-size="9.5" fill="#0e7490">run automatically on container start</text>
+</svg>

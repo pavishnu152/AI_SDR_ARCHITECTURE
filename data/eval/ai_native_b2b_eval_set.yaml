@@ -1,0 +1,450 @@
+# Synthetic evaluation dataset for the Scoring Agent.
+#
+# Why synthetic (fictional) companies instead of real ones scraped live:
+# 1. Determinism/reproducibility — a real company's funding/hiring/marketing
+#    pages change over time, so an eval built on live-scraped data would
+#    silently drift: the same eval script could report a different pass
+#    rate next month with no code change. A versioned, fixed fixture file
+#    stays stable, which is what makes it useful for regression testing
+#    ("did my last prompt change make scoring worse?").
+# 2. Isolation — this eval measures the Scoring Agent specifically (does it
+#    correctly weigh a GIVEN set of signals against the ICP rubric), not
+#    the Research Agent's ability to find real signals on the live web.
+#    Conflating the two would make a failure ambiguous: is scoring wrong,
+#    or did research just find less this time?
+# 3. No risk of asserting inaccurate facts about real companies.
+#
+# expected_band is the ground-truth label a human would assign, one of:
+# reject / review / ready — matching configs/icp_ai_native_b2b.yaml's
+# score_thresholds. The eval harness (src/eval/run_eval.py) runs each
+# entry's `research` through the real Scoring Agent and checks whether the
+# resulting score falls in the same band.
+
+companies:
+  # ---------------------------------------------------------------------
+  # READY — strong, multi-signal fits (9)
+  # ---------------------------------------------------------------------
+  - company_name: "NimbusForge AI"
+    domain: "nimbusforge.ai"
+    expected_band: ready
+    research:
+      summary: >
+        NimbusForge AI is a ~40-person startup building an agent
+        orchestration platform for enterprise DevOps teams.
+      signals:
+        - label: recent_funding
+          detail: "Raised $18M Series A led by a top-tier VC, announced last month, explicitly framed as an AI infrastructure company."
+          source_url: "https://example-news.test/nimbusforge-series-a"
+        - label: ai_job_postings
+          detail: "12 open roles for 'ML Engineer' and 'Applied Scientist' on their careers page."
+          source_url: "https://nimbusforge.ai/careers"
+        - label: product_ai_mention
+          detail: "Homepage headline: 'The agent orchestration platform for AI-native DevOps.'"
+          source_url: "https://nimbusforge.ai"
+        - label: engineering_team_signal
+          detail: "Active public GitHub org with 200+ stars across open-source tooling repos."
+          source_url: "https://github.com/nimbusforge"
+      sources:
+        - "https://example-news.test/nimbusforge-series-a"
+        - "https://nimbusforge.ai/careers"
+        - "https://nimbusforge.ai"
+        - "https://github.com/nimbusforge"
+
+  - company_name: "Cascadia Cognition"
+    domain: "cascadiacognition.com"
+    expected_band: ready
+    research:
+      summary: >
+        Cascadia Cognition builds an applied-AI copilot for insurance
+        underwriters, recently raised a Series B.
+      signals:
+        - label: recent_funding
+          detail: "$45M Series B, press release headline: 'Cascadia Cognition raises $45M to scale its AI underwriting copilot.'"
+          source_url: "https://example-news.test/cascadia-series-b"
+        - label: product_ai_mention
+          detail: "Product page: 'Our LLM-powered copilot reviews policies 10x faster.'"
+          source_url: "https://cascadiacognition.com/product"
+        - label: ai_job_postings
+          detail: "8 listings for 'Applied ML Scientist' and 'AI Platform Engineer.'"
+          source_url: "https://cascadiacognition.com/careers"
+      sources:
+        - "https://example-news.test/cascadia-series-b"
+        - "https://cascadiacognition.com/product"
+        - "https://cascadiacognition.com/careers"
+
+  - company_name: "Verdant Analytics"
+    domain: "verdant-analytics.io"
+    expected_band: ready
+    research:
+      summary: >
+        Verdant Analytics is a climate-data startup whose core product is a
+        machine learning forecasting engine for agricultural supply chains.
+      signals:
+        - label: product_ai_mention
+          detail: "Tagline: 'Machine learning forecasts for a changing climate.' Entire product is described as an ML platform."
+          source_url: "https://verdant-analytics.io"
+        - label: engineering_team_signal
+          detail: "Technical blog with 30+ posts on model architecture and MLOps practices."
+          source_url: "https://verdant-analytics.io/blog"
+        - label: ai_job_postings
+          detail: "5 open 'Machine Learning Engineer' roles."
+          source_url: "https://verdant-analytics.io/careers"
+      sources:
+        - "https://verdant-analytics.io"
+        - "https://verdant-analytics.io/blog"
+        - "https://verdant-analytics.io/careers"
+
+  - company_name: "PixelMind Labs"
+    domain: "pixelmindlabs.com"
+    expected_band: ready
+    research:
+      summary: >
+        PixelMind Labs builds generative AI tools for e-commerce product
+        photography, seed-stage but growing fast.
+      signals:
+        - label: recent_funding
+          detail: "$6M seed round, framed in press as 'generative AI for retail.'"
+          source_url: "https://example-news.test/pixelmind-seed"
+        - label: product_ai_mention
+          detail: "Landing page demos a generative AI image pipeline directly in the hero section."
+          source_url: "https://pixelmindlabs.com"
+        - label: ai_job_postings
+          detail: "Hiring a 'Generative AI Research Engineer' and 'Computer Vision Engineer.'"
+          source_url: "https://pixelmindlabs.com/jobs"
+      sources:
+        - "https://example-news.test/pixelmind-seed"
+        - "https://pixelmindlabs.com"
+        - "https://pixelmindlabs.com/jobs"
+
+  - company_name: "TrueNorth Agents"
+    domain: "truenorthagents.com"
+    expected_band: ready
+    research:
+      summary: >
+        TrueNorth Agents sells an autonomous customer-support agent
+        platform to mid-market SaaS companies.
+      signals:
+        - label: product_ai_mention
+          detail: "Entire product is named 'agents' — homepage: 'Deploy autonomous support agents in minutes.'"
+          source_url: "https://truenorthagents.com"
+        - label: recent_funding
+          detail: "$22M Series A, announced 6 weeks ago, investor quote calls them 'a leader in agentic AI.'"
+          source_url: "https://example-news.test/truenorth-series-a"
+        - label: engineering_team_signal
+          detail: "Public engineering blog covering their agent evaluation framework, 15 technical posts."
+          source_url: "https://truenorthagents.com/engineering"
+        - label: ai_job_postings
+          detail: "9 roles including 'Agent Evaluation Engineer' and 'LLM Infrastructure Engineer.'"
+          source_url: "https://truenorthagents.com/careers"
+      sources:
+        - "https://truenorthagents.com"
+        - "https://example-news.test/truenorth-series-a"
+        - "https://truenorthagents.com/engineering"
+        - "https://truenorthagents.com/careers"
+
+  - company_name: "Solstice ML"
+    domain: "solsticeml.com"
+    expected_band: ready
+    research:
+      summary: >
+        Solstice ML provides an MLOps platform for deploying and monitoring
+        models in regulated industries (healthcare, finance).
+      signals:
+        - label: product_ai_mention
+          detail: "Product is explicitly an 'MLOps platform' — every page references model deployment and monitoring."
+          source_url: "https://solsticeml.com"
+        - label: ai_job_postings
+          detail: "6 open 'MLOps Engineer' and 'ML Platform Engineer' roles."
+          source_url: "https://solsticeml.com/careers"
+        - label: engineering_team_signal
+          detail: "Active open-source model-monitoring library with community contributors on GitHub."
+          source_url: "https://github.com/solsticeml"
+      sources:
+        - "https://solsticeml.com"
+        - "https://solsticeml.com/careers"
+        - "https://github.com/solsticeml"
+
+  - company_name: "Ampersand Intelligence"
+    domain: "ampersand.ai"
+    expected_band: ready
+    research:
+      summary: >
+        Ampersand Intelligence recently rebranded from a generic analytics
+        company to an "AI-native" data platform after a funding round.
+      signals:
+        - label: recent_funding
+          detail: "$30M Series B explicitly described in press as funding to 'build out their AI-native data platform.'"
+          source_url: "https://example-news.test/ampersand-series-b"
+        - label: product_ai_mention
+          detail: "New homepage copy: 'AI-native analytics, built for the LLM era.'"
+          source_url: "https://ampersand.ai"
+        - label: ai_job_postings
+          detail: "10 new AI/ML roles posted in the last 30 days, per their careers page."
+          source_url: "https://ampersand.ai/careers"
+      sources:
+        - "https://example-news.test/ampersand-series-b"
+        - "https://ampersand.ai"
+        - "https://ampersand.ai/careers"
+
+  - company_name: "Lucid Loop AI"
+    domain: "lucidloop.ai"
+    expected_band: ready
+    research:
+      summary: >
+        Lucid Loop AI builds a coding-agent product for enterprise software
+        teams, well-funded and technically visible.
+      signals:
+        - label: recent_funding
+          detail: "$60M Series C led by a well-known AI-focused fund, explicit 'coding agent' framing in the announcement."
+          source_url: "https://example-news.test/lucidloop-series-c"
+        - label: product_ai_mention
+          detail: "Product literally named 'the coding agent for enterprise teams.'"
+          source_url: "https://lucidloop.ai"
+        - label: engineering_team_signal
+          detail: "Frequent conference talks and a well-known technical blog on agentic coding evaluation."
+          source_url: "https://lucidloop.ai/blog"
+        - label: ai_job_postings
+          detail: "20+ open engineering roles, majority tagged 'AI/Agents' on their careers board."
+          source_url: "https://lucidloop.ai/careers"
+      sources:
+        - "https://example-news.test/lucidloop-series-c"
+        - "https://lucidloop.ai"
+        - "https://lucidloop.ai/blog"
+        - "https://lucidloop.ai/careers"
+
+  - company_name: "Meridian Copilot"
+    domain: "meridiancopilot.com"
+    expected_band: ready
+    research:
+      summary: >
+        Meridian Copilot sells an AI copilot for financial analysts,
+        early-stage but with clear technical and funding signals.
+      signals:
+        - label: recent_funding
+          detail: "$9M seed, TechCrunch-style coverage headlined 'Meridian raises seed to build AI copilot for Wall Street analysts.'"
+          source_url: "https://example-news.test/meridian-seed"
+        - label: product_ai_mention
+          detail: "Product page centers entirely on 'your AI copilot for financial modeling.'"
+          source_url: "https://meridiancopilot.com/product"
+        - label: ai_job_postings
+          detail: "4 open roles for 'NLP Engineer' and 'AI Product Engineer.'"
+          source_url: "https://meridiancopilot.com/careers"
+      sources:
+        - "https://example-news.test/meridian-seed"
+        - "https://meridiancopilot.com/product"
+        - "https://meridiancopilot.com/careers"
+
+  # ---------------------------------------------------------------------
+  # REVIEW — borderline, 1-2 partial or ambiguous signals (8)
+  # ---------------------------------------------------------------------
+  - company_name: "BrightPath Software"
+    domain: "brightpathsoftware.com"
+    expected_band: review
+    research:
+      summary: >
+        BrightPath Software is a project-management SaaS tool that added a
+        single "AI summary" feature to their product last quarter.
+      signals:
+        - label: product_ai_mention
+          detail: "One feature page mentions 'AI-generated meeting summaries' — the rest of the product is standard PM software."
+          source_url: "https://brightpathsoftware.com/features/ai-summary"
+      sources:
+        - "https://brightpathsoftware.com/features/ai-summary"
+
+  - company_name: "Ironclad Logistics Tech"
+    domain: "ironcladlogistics.com"
+    expected_band: review
+    research:
+      summary: >
+        Ironclad Logistics Tech is a fleet-management software company that
+        raised funding, but the funding announcement doesn't mention AI at all.
+      signals:
+        - label: recent_funding
+          detail: "$15M Series A raised, but press release frames it as 'scaling our fleet management platform' with no AI mention."
+          source_url: "https://example-news.test/ironclad-series-a"
+      sources:
+        - "https://example-news.test/ironclad-series-a"
+
+  - company_name: "Fernwood Data Co"
+    domain: "fernwooddata.com"
+    expected_band: review
+    research:
+      summary: >
+        Fernwood Data Co is a data-warehousing company hiring one machine
+        learning engineer, seemingly for an internal recommendation feature.
+      signals:
+        - label: ai_job_postings
+          detail: "Single open role: 'Machine Learning Engineer (internal tools)' — appears to be one hire, not a core team."
+          source_url: "https://fernwooddata.com/careers"
+      sources:
+        - "https://fernwooddata.com/careers"
+
+  - company_name: "Pinnacle CRM Systems"
+    domain: "pinnaclecrm.com"
+    expected_band: review
+    research:
+      summary: >
+        Pinnacle CRM Systems is an established CRM vendor whose marketing
+        uses "AI-powered" language loosely without clear product substance.
+      signals:
+        - label: product_ai_mention
+          detail: "Homepage banner says 'AI-powered insights' but the linked feature page describes standard rule-based reporting."
+          source_url: "https://pinnaclecrm.com"
+      sources:
+        - "https://pinnaclecrm.com"
+
+  - company_name: "Anchor Point Security"
+    domain: "anchorpointsecurity.com"
+    expected_band: review
+    research:
+      summary: >
+        Anchor Point Security is a cybersecurity vendor with a genuinely
+        technical team and one publicized ML-based anomaly detection feature.
+      signals:
+        - label: product_ai_mention
+          detail: "One product line, 'Anchor Detect,' is described as using 'machine learning anomaly detection' — rest of suite is traditional."
+          source_url: "https://anchorpointsecurity.com/products/detect"
+        - label: engineering_team_signal
+          detail: "Technical blog exists but covers general security research, only occasionally ML topics."
+          source_url: "https://anchorpointsecurity.com/blog"
+      sources:
+        - "https://anchorpointsecurity.com/products/detect"
+        - "https://anchorpointsecurity.com/blog"
+
+  - company_name: "Riverside SaaS Group"
+    domain: "riversidesaas.com"
+    expected_band: review
+    research:
+      summary: >
+        Riverside SaaS Group operates several small B2B SaaS products; one
+        subsidiary brand mentions AI, the parent company's materials do not.
+      signals:
+        - label: product_ai_mention
+          detail: "A sub-brand's page mentions 'AI-assisted scheduling' as one of many features."
+          source_url: "https://riversidesaas.com/products/scheduler"
+      sources:
+        - "https://riversidesaas.com/products/scheduler"
+
+  - company_name: "Quill & Ledger Fintech"
+    domain: "quillandledger.com"
+    expected_band: review
+    research:
+      summary: >
+        Quill & Ledger is an accounting-automation startup that raised a
+        modest round; funding and hiring signals exist but are small in scale.
+      signals:
+        - label: recent_funding
+          detail: "$3M pre-seed round, brief mention of 'automation' but not specifically AI/ML in the announcement."
+          source_url: "https://example-news.test/quillandledger-preseed"
+        - label: ai_job_postings
+          detail: "One contractor listing for 'ML consultant, part-time' — unclear if this becomes a core function."
+          source_url: "https://quillandledger.com/careers"
+      sources:
+        - "https://example-news.test/quillandledger-preseed"
+        - "https://quillandledger.com/careers"
+
+  - company_name: "Crestline Analytics"
+    domain: "crestlineanalytics.com"
+    expected_band: review
+    research:
+      summary: >
+        Crestline Analytics is a BI/dashboarding tool with a public
+        engineering blog that occasionally covers ML topics among many others.
+      signals:
+        - label: engineering_team_signal
+          detail: "Engineering blog has 40 posts total; roughly 3 touch on ML/forecasting, the rest are general data-engineering topics."
+          source_url: "https://crestlineanalytics.com/blog"
+      sources:
+        - "https://crestlineanalytics.com/blog"
+
+  # ---------------------------------------------------------------------
+  # REJECT — weak/no fit (8)
+  # ---------------------------------------------------------------------
+  - company_name: "Oakridge Furniture Co"
+    domain: "oakridgefurniture.com"
+    expected_band: reject
+    research:
+      summary: >
+        Oakridge Furniture Co is a regional furniture manufacturer and
+        retailer with no technology signals found.
+      signals: []
+      sources:
+        - "https://oakridgefurniture.com"
+
+  - company_name: "Bramblebee Bakery Supply"
+    domain: "bramblebeesupply.com"
+    expected_band: reject
+    research:
+      summary: >
+        Bramblebee Bakery Supply distributes baking ingredients to
+        restaurants; a traditional B2B distribution business.
+      signals: []
+      sources:
+        - "https://bramblebeesupply.com"
+
+  - company_name: "Sterling Legal Partners"
+    domain: "sterlinglegalpartners.com"
+    expected_band: reject
+    research:
+      summary: >
+        Sterling Legal Partners is a regional law firm specializing in real
+        estate transactions. No product, funding, or hiring signals related to AI.
+      signals: []
+      sources:
+        - "https://sterlinglegalpartners.com"
+
+  - company_name: "Coastal Fitness Franchise"
+    domain: "coastalfitness.com"
+    expected_band: reject
+    research:
+      summary: >
+        Coastal Fitness Franchise operates gym locations; standard
+        franchise business with no technology product.
+      signals: []
+      sources:
+        - "https://coastalfitness.com"
+
+  - company_name: "Timberline Landscaping"
+    domain: "timberlinelandscaping.com"
+    expected_band: reject
+    research:
+      summary: >
+        Timberline Landscaping is a commercial landscaping services company.
+        No signals of any technology investment found.
+      signals: []
+      sources:
+        - "https://timberlinelandscaping.com"
+
+  - company_name: "Union Square Realty"
+    domain: "unionsquarerealty.com"
+    expected_band: reject
+    research:
+      summary: >
+        Union Square Realty is a residential real estate brokerage. Website
+        and press mentions are entirely about property listings and agents.
+      signals: []
+      sources:
+        - "https://unionsquarerealty.com"
+
+  - company_name: "Prairie Grain Co-op"
+    domain: "prairiegraincoop.com"
+    expected_band: reject
+    research:
+      summary: >
+        Prairie Grain Co-op is an agricultural cooperative handling grain
+        storage and trading for local farmers. No AI/tech signals found.
+      signals: []
+      sources:
+        - "https://prairiegraincoop.com"
+
+  - company_name: "Harbor View Hospitality"
+    domain: "harborviewhospitality.com"
+    expected_band: reject
+    research:
+      summary: >
+        Harbor View Hospitality manages a small chain of boutique hotels.
+        Marketing is entirely focused on guest experience and amenities, no
+        technology signals present.
+      signals: []
+      sources:
+        - "https://harborviewhospitality.com"

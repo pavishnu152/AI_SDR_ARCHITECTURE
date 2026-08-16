@@ -1,0 +1,52 @@
+# Local/dev stack: the API + a real Postgres, wired together the same way
+# they'd talk to each other in production (minus a managed DB and a real
+# secrets store). Run from the project root with:
+#   docker compose -f docker/docker-compose.yml up --build
+#
+# Requires a .env file at the project root (copy .env.example -> .env and
+# fill in ANTHROPIC_API_KEY) — env_file below loads it for the api service.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ai_sdr
+      POSTGRES_PASSWORD: ai_sdr
+      POSTGRES_DB: ai_sdr
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      # pg_isready confirms Postgres is actually accepting connections, not
+      # just that the container process is running — the api service's
+      # `depends_on: condition: service_healthy` below waits for this, not
+      # just for the container to exist, which is what actually prevents
+      # the classic "API starts before the DB is ready" race.
+      test: ["CMD-SHELL", "pg_isready -U ai_sdr -d ai_sdr"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    env_file:
+      - ../.env
+    environment:
+      # Overrides whatever DATABASE_URL is in .env: your local .env points
+      # at "localhost" for running the app outside Docker, but inside the
+      # Compose network the Postgres container is reachable at the service
+      # name "postgres", not localhost. This is the one line that makes
+      # the same .env file work in both contexts.
+      DATABASE_URL: postgresql+psycopg2://ai_sdr:ai_sdr@postgres:5432/ai_sdr
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

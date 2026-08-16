@@ -1,0 +1,52 @@
+# Ideal Customer Profile (ICP) definition — externalized on purpose.
+#
+# Why this lives in a YAML config instead of hardcoded in the Scoring
+# Agent's prompt: the ICP is a business decision, not a code decision. A
+# sales/RevOps person should be able to tune weights or add a criterion
+# without touching Python or redeploying the agent logic. This is the same
+# reason production recommender/ranking systems keep business rules in
+# config, not inline in model code.
+
+name: "AI-native B2B companies"
+description: >
+  Startups and scale-ups building AI products or actively adopting AI
+  infrastructure (AI dev tools, agent platforms, MLOps, applied-AI SaaS).
+  These companies are the fastest-growing B2B buying category right now
+  and are likely to value/understand an AI-powered sales/GTM tool.
+
+criteria:
+  - label: recent_funding
+    weight: 25
+    description: >
+      Company has raised funding recently (seed through Series B+), especially
+      if press coverage explicitly frames them as an AI company. Recent capital
+      signals budget for new tools and urgency to scale go-to-market.
+
+  - label: ai_job_postings
+    weight: 25
+    description: >
+      Company is actively hiring for ML/AI engineer, applied scientist, or
+      similar roles. Active AI hiring is a strong, hard-to-fake signal that
+      AI is core to the product, not just marketing language.
+
+  - label: product_ai_mention
+    weight: 30
+    description: >
+      Company's own product pages/marketing describe the product using terms
+      like "AI", "agent", "LLM", "copilot", "machine learning". This is the
+      most direct signal of ICP fit but also the easiest to game with buzzwords,
+      so it should be weighted alongside, not instead of, the harder signals above.
+
+  - label: engineering_team_signal
+    weight: 20
+    description: >
+      Evidence of an engineering-heavy team: public GitHub presence, technical
+      blog, high volume of engineering job postings relative to company size.
+      Indicates the company can actually operationalize an AI-based GTM tool.
+
+# Score interpretation bands (out of 100). The Scoring Agent uses these as
+# guidance, not hard rules — reasoning matters more than the exact number.
+score_thresholds:
+  reject: 40    # 0-40: weak/no fit, do not pursue
+  review: 70    # 41-70: borderline, needs human review before outreach
+  ready: 71     # 71-100: strong fit, proceed to drafting

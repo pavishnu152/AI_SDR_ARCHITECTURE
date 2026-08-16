@@ -1,0 +1,80 @@
+# Render Blueprint — deploys the API (Docker), the dashboard (static site),
+# and a managed Postgres database from this one file. Schema verified
+# against Render's current Blueprint YAML reference (docs.render.com/
+# blueprint-spec) on 2026-08-08, not written from memory.
+#
+# Two-pass deploy, and this is a real constraint, not an oversight: the API
+# and dashboard each need to know the other's live onrender.com URL (for
+# CORS_ALLOWED_ORIGINS and VITE_API_BASE_URL respectively), but Render only
+# assigns those URLs once the services exist — and if "ai-sdr-api" is
+# already taken by another Render account, your actual URL will differ from
+# what's guessed below. See docs/deployment.md for the exact steps: deploy
+# once, note the two real URLs, update the two env vars below (or directly
+# in the dashboard) to match, redeploy.
+
+services:
+  - type: web
+    name: ai-sdr-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./docker/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ai-sdr-db
+          property: connectionString
+      - key: ANTHROPIC_API_KEY
+        sync: false # set manually in the Render dashboard — never commit real keys
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: JWT_ALGORITHM
+        value: HS256
+      - key: JWT_EXPIRE_MINUTES
+        value: 60
+      - key: APP_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      - key: ICP_CONFIG_PATH
+        value: configs/icp_ai_native_b2b.yaml
+      - key: RESEARCH_SCORING_MODEL
+        value: claude-haiku-4-5-20251001
+      - key: DRAFTING_GUARDRAIL_MODEL
+        value: claude-sonnet-5
+      - key: CORS_ALLOWED_ORIGINS
+        # Best-guess default — confirm/update after first deploy, see the
+        # two-pass note above.
+        value: https://ai-sdr-dashboard.onrender.com
+
+  - type: web
+    name: ai-sdr-dashboard
+    runtime: static
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: frontend/dist
+    envVars:
+      - key: VITE_API_BASE_URL
+        # Best-guess default — confirm/update after first deploy, see the
+        # two-pass note above. Vite bakes this in at BUILD time, so
+        # changing it requires a redeploy, not just an env var edit.
+        value: https://ai-sdr-api.onrender.com
+    routes:
+      # Client-side routing (react-router-dom's BrowserRouter) means a
+      # direct load of e.g. /leads/<uuid> must still serve index.html and
+      # let the SPA's router take over — without this, refreshing on any
+      # route but "/" returns a 404 from the static file server.
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+databases:
+  - name: ai-sdr-db
+    databaseName: ai_sdr
+    user: ai_sdr
+    plan: free
+    # Render's free Postgres plan expires 30 days after creation (14-day
+    # grace period after that) — a real limitation for a portfolio demo
+    # left running unattended, documented in docs/deployment.md, not
+    # hidden. Upgrading to basic-256mb ($6-7/mo at time of writing) removes
+    # the expiry if this needs to stay up long-term.

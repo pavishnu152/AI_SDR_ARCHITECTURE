@@ -13,9 +13,12 @@ env/
 .ruff_cache/
 htmlcov/
 .coverage
+.coverage.*
+coverage.xml
 dist/
 build/
 node_modules/
 .DS_Store
 *.log
 docker/*.env
+eval_results/

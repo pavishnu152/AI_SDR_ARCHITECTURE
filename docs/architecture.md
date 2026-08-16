@@ -80,7 +80,7 @@
 | Containerization | Docker + docker-compose (api + postgres) | Standard requirement, low effort given API-only workload |
 | CI/CD | GitHub Actions (lint, test, build) | Signals engineering maturity beyond "it runs on my machine" |
 | Deployment | Render or Railway (free/cheap tier, Docker + managed Postgres) | No GPU needed anywhere in this stack, so free-tier hosting is genuinely sufficient |
-| Frontend | Deferred to its own later milestone — lightweight dashboard (leads, scores, drafts, agent trace viewer) | Kept out of MVP scope so agent quality isn't rushed to hit a UI deadline |
+| Frontend | React + Vite + TypeScript, hand-written CSS, `react-router-dom` | Lightweight dashboard (leads list/create, lead detail, agent trace viewer) kept out of MVP scope until the agent quality itself was solid — built in Milestone 13 against the finished API, not alongside a moving backend |
 
 ---
 
@@ -98,14 +98,23 @@ AI-SDR-Architecture/
 │   ├── services/          # ties agents + db together
 │   └── main.py
 ├── tests/
-├── frontend/               # later milestone
+├── frontend/               # React + Vite + TS dashboard (Milestone 13)
+│   └── src/
+│       ├── pages/          # LoginPage, LeadsPage, LeadDetailPage
+│       ├── components/     # StatusBadge, ProtectedRoute
+│       ├── api.ts          # typed fetch client
+│       └── auth.tsx        # JWT auth context
 ├── docker/
 │   ├── Dockerfile
 │   └── docker-compose.yml
 ├── .github/workflows/ci.yml
 ├── docs/
 │   ├── architecture.md    # this file, evolved
-│   └── architecture-diagram.png
+│   ├── architecture-diagram.svg
+│   ├── milestone10-langgraph-refactor.md
+│   ├── deployment.md
+│   └── demo.md
+├── render.yaml            # Render Blueprint (Milestone 14)
 ├── .env.example
 ├── pyproject.toml
 ├── README.md
@@ -127,18 +136,18 @@ AI-SDR-Architecture/
 
 1. **Problem definition + architecture design** ✅
 2. **Repo scaffolding, DB schema, core config** ✅
-3. Research Agent + web search/scrape tools
-4. Scoring Agent (structured output, ICP config)
-5. Drafting Agent + Guardrail Agent
-6. Orchestrator (hand-rolled state machine)
-7. FastAPI endpoints + JWT auth
-8. Logging + evaluation harness + eval dataset
-9. Testing (unit + integration, mocked LLM)
-10. Refactor orchestration to LangGraph (documented before/after comparison)
-11. Docker + docker-compose
-12. CI/CD (GitHub Actions)
-13. Frontend dashboard
-14. Deployment, README, architecture diagram, demo, future-improvements doc
+3. **Research Agent + web search/scrape tools** ✅
+4. **Scoring Agent (structured output, ICP config)** ✅
+5. **Drafting Agent + Guardrail Agent** ✅
+6. **Orchestrator (hand-rolled state machine)** ✅
+7. **FastAPI endpoints + JWT auth** ✅
+8. **Logging + evaluation harness + eval dataset** ✅
+9. **Testing (unit + integration, mocked LLM)** ✅
+10. **Refactor orchestration to LangGraph (documented before/after comparison)** ✅
+11. **Docker + docker-compose** ✅ (Dockerfile/compose statically verified in-sandbox — no Docker daemon available there; real build/run verification landed in Milestone 12's CI, see below)
+12. **CI/CD (GitHub Actions)** ✅
+13. **Frontend dashboard (React + Vite + TS)** ✅
+14. **Deployment (Render Blueprint), final README, architecture diagram, demo walkthrough, future-improvements doc** ✅ — Phase 1 complete
 
 ---
 
@@ -158,8 +167,56 @@ Eval set (Milestone 8) will be ~25 real or realistic AI-native companies hand-la
 
 ## 9. Future Improvements (post-MVP, good interview talking points)
 
+**Product scope, deliberately deferred:**
 - Real email/CRM integration (Gmail API, HubSpot/Salesforce)
 - Multi-tenant support with per-org ICP configs
 - Swap DuckDuckGo for a paid enrichment API (Clearbit/Apollo) for higher-quality signals
 - Human-in-the-loop approval queue in the frontend before any draft is marked "ready to send"
-- Cost/latency dashboard per agent run
+
+**Now built, noted here for history:** a cost/latency dashboard per agent
+run was originally listed as a future improvement — Milestone 13 built it
+(the `AgentLog` audit table + the dashboard's agent trace viewer,
+`GET /leads/{id}/logs`). What's still missing is aggregation *across* leads
+(e.g. total spend this week) — currently you can only see cost/latency for
+one lead at a time.
+
+**Engineering tradeoffs made explicitly during the build, consolidated
+here from inline code comments so they're in one place:**
+
+- **Synchronous pipeline execution** (`src/api/leads.py`) — `POST /leads`
+  blocks the request until all four agents finish (~30s). Fine for a
+  single-user demo; a background task queue (Celery/RQ/arq) is the correct
+  fix once this needs to serve concurrent users, returning a `202` +
+  lead ID immediately and letting the client poll or receive a webhook.
+- **JWT stored in `localStorage`, not an httpOnly cookie**
+  (`frontend/src/auth.tsx`) — simpler to wire up, but XSS-exposed (any
+  script that runs on the page can read it). The correct fix is the
+  backend setting an httpOnly, Secure, SameSite cookie on login instead of
+  returning the token in a JSON body, which requires a CORS/cookie rework
+  on the FastAPI side.
+- **Docker layer caching is not fully optimized** (`docker/Dockerfile`) —
+  `pip install .` on a src-layout package needs the actual source present,
+  so the classic "copy dependency file, install, then copy source" caching
+  trick doesn't cleanly apply here. The fix is a pip-compile'd,
+  dependencies-only `requirements.txt` installed before the source is
+  copied — deferred to avoid adding a new tool/process for a
+  portfolio-stage build.
+- **Frontend types are hand-mirrored, not generated**
+  (`frontend/src/types.ts`) — a hand-written copy of the Pydantic schemas
+  in `src/schemas/`, which can silently drift if a backend field is
+  renamed. Generating them from the FastAPI OpenAPI schema (e.g.
+  `openapi-typescript`) removes that drift risk; not worth the extra build
+  step for a single-developer project yet.
+- **`GET /leads` pagination has no upper bound on `limit`** — a client can
+  request `?limit=999999` and get every row back in one response. Low risk
+  at current scale, but a real API should cap it server-side (e.g. 200) and
+  return `422` above that, not just document it.
+- **No API rate limiting** — the auth layer prevents unauthenticated
+  access but nothing currently throttles a single authenticated user
+  hammering `POST /leads` (each call costs real LLM spend). A per-user
+  rate limit (e.g. `slowapi`) is a reasonable next step before this is
+  exposed beyond a personal demo.
+- **Render's free Postgres expires 30 days after creation** (see
+  `docs/deployment.md`) — fine for a portfolio project you actively
+  maintain, not a real persistence guarantee. Upgrading just the database
+  tier removes this without needing paid compute.
