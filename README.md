@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # AI SDR — Multi-Agent Sales Lead Research & Qualification System
 
 A multi-agent system that, given a company name, autonomously researches it,
@@ -166,3 +167,6 @@ AI-SDR-Architecture/
   hand-rolled state machine vs. LangGraph, compared directly
 - [`docs/deployment.md`](docs/deployment.md) — Render deployment guide
 - [`docs/demo.md`](docs/demo.md) — end-to-end walkthrough
+=======
+# AI-SDR-Architecture
+>>>>>>> 8e81b5da6536ec820d04790418b1c91ae6d13059
