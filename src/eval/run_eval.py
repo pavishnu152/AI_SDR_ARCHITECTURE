@@ -11,11 +11,12 @@ and reports:
 - mean latency and total cost per run — architecture.md's evaluation plan
   explicitly calls for tracking both, not just accuracy alone
 
-Run for real (requires a valid ANTHROPIC_API_KEY):
+Run for real (requires a valid GEMINI_API_KEY):
     python -m src.eval.run_eval
 
-This makes 25 real Scoring Agent calls against the live Claude API — a
-small, deliberate cost, not something to run in CI on every commit. The
+This makes 25 real Scoring Agent calls against the live Gemini API — free
+tier, but still not something to run in CI on every commit (rate limits).
+The
 harness's grading/aggregation logic is unit-tested with a fake score_fn
 (see tests/eval/test_run_eval.py) so it's verified without spending API
 credits or needing network access.
@@ -111,7 +112,7 @@ def run_eval(
     score_fn: Callable = score_lead,
 ) -> EvalReport:
     """
-    score_fn defaults to the real score_lead (makes real Anthropic API
+    score_fn defaults to the real score_lead (makes real Gemini API
     calls when actually run). Tests inject a fake with the same signature
     to verify grading/aggregation logic without hitting the network — the
     harness's correctness (confusion matrix math, precision/recall,

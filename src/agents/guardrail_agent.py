@@ -26,13 +26,18 @@ Design decisions worth understanding:
 3. approved=False is the SAFE default embedded in the tool schema/prompt:
    if the model is unsure, it must not approve. A guardrail that defaults
    to "probably fine" is not a guardrail.
-"""
+
+4. LLM client: `openai` SDK pointed at Google's Gemini
+   OpenAI-compatible endpoint. The provider configuration is centralized
+   in src/core/config.py..
+   """
+import json
 import time
 from dataclasses import dataclass
 
-import anthropic
+import openai
 
-from src.core.config import get_settings
+from src.core.config import settings
 from src.core.logging import get_agent_logger
 from src.core.pricing import estimate_cost_usd, extract_token_usage
 from src.schemas.lead import DraftOutput, GuardrailVerdict, ResearchOutput
@@ -61,23 +66,26 @@ prospect.
 Call submit_verdict exactly once."""
 
 SUBMIT_VERDICT_TOOL = {
-    "name": "submit_verdict",
-    "description": "Submit the final fact-check verdict for this draft.",
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "approved": {"type": "boolean"},
-            "unsupported_claims": {
-                "type": "array",
-                "items": {"type": "string"},
-                "description": "Claims from the draft that are NOT supported by the research.",
+    "type": "function",
+    "function": {
+        "name": "submit_verdict",
+        "description": "Submit the final fact-check verdict for this draft.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "approved": {"type": "boolean"},
+                "unsupported_claims": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Claims from the draft that are NOT supported by the research.",
+                },
+                "notes": {
+                    "type": "string",
+                    "description": "Brief explanation of the verdict, for the audit log.",
+                },
             },
-            "notes": {
-                "type": "string",
-                "description": "Brief explanation of the verdict, for the audit log.",
-            },
+            "required": ["approved", "unsupported_claims", "notes"],
         },
-        "required": ["approved", "unsupported_claims", "notes"],
     },
 }
 
@@ -104,29 +112,55 @@ def _format_prompt(research: ResearchOutput, draft: DraftOutput) -> str:
         f"--- Draft message to review ---\n{draft.message}"
     )
 
+def _mock_guardrail_result() -> GuardrailAgentResult:
+    output = GuardrailVerdict(
+        approved=True,
+        unsupported_claims=[],
+        notes="[MOCK] Auto-approved (Gemini call skipped, mock_llm=true).",
+    )
+    return GuardrailAgentResult(
+        success=True,
+        output=output,
+        model="mock",
+        latency_ms=10,
+        raw_input_summary="[MOCK] guardrail input",
+        raw_output_summary=output.notes,
+        input_tokens=0,
+        output_tokens=0,
+        cost_usd=0.0,
+    )
 
 def check_draft(
     research: ResearchOutput,
     draft: DraftOutput,
     *,
-    client: "anthropic.Anthropic | None" = None,
+    client: "openai.OpenAI | None" = None,
 ) -> GuardrailAgentResult:
-    settings = get_settings()
-    model = settings.drafting_guardrail_model
-    client = client or anthropic.Anthropic(api_key=settings.anthropic_api_key)
+    config = settings()
+    model = config.drafting_guardrail_model
+    if config.mock_llm:
+        logger.info("mock_llm enabled — returning canned guardrail verdict")
+        return _mock_guardrail_result()
 
+
+    client = client or openai.OpenAI(
+    base_url=config.gemini_base_url,
+    api_key=config.gemini_api_key,
+)
     user_prompt = _format_prompt(research, draft)
     start = time.perf_counter()
     logger.info("guardrail check started", extra={"model": model})
 
     try:
-        response = client.messages.create(
+        response = client.chat.completions.create(
             model=model,
             max_tokens=MAX_TOKENS,
-            system=SYSTEM_PROMPT,
             tools=[SUBMIT_VERDICT_TOOL],
-            tool_choice={"type": "tool", "name": "submit_verdict"},
-            messages=[{"role": "user", "content": user_prompt}],
+            tool_choice={"type": "function", "function": {"name": "submit_verdict"}},
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": user_prompt},
+            ],
         )
     except Exception as exc:  # noqa: BLE001 — see research_agent.py's matching except clause
         latency_ms = int((time.perf_counter() - start) * 1000)
@@ -141,9 +175,10 @@ def check_draft(
     input_tokens, output_tokens = extract_token_usage(response)
     cost_usd = estimate_cost_usd(model, input_tokens, output_tokens)
 
-    tool_use_block = next((b for b in response.content if b.type == "tool_use"), None)
-    if tool_use_block is None:
-        logger.error("guardrail response had no tool_use block despite forced tool_choice")
+    tool_calls = response.choices[0].message.tool_calls or []
+    tool_call = next((tc for tc in tool_calls if tc.function.name == "submit_verdict"), None)
+    if tool_call is None:
+        logger.error("guardrail response had no tool call despite forced tool_choice")
         return GuardrailAgentResult(
             success=False, output=None, model=model, latency_ms=latency_ms,
             error="model did not call submit_verdict despite forced tool_choice",
@@ -151,7 +186,7 @@ def check_draft(
         )
 
     try:
-        output = GuardrailVerdict(**tool_use_block.input)
+        output = GuardrailVerdict(**json.loads(tool_call.function.arguments))
     except Exception as exc:  # noqa: BLE001
         logger.error("submit_verdict payload invalid", extra={"error": str(exc)})
         return GuardrailAgentResult(

@@ -87,10 +87,10 @@ def get_icp_config(path: str | None = None) -> ICPConfig:
     """
     Cached loader — parses the YAML once per process. Pass an explicit path
     in tests to load a fixture config without touching the real one; falls
-    back to settings.icp_config_path otherwise.
+    back to settings().icp_config_path otherwise.
     """
     if path is None:
-        from src.core.config import get_settings
+        from src.core.config import settings
 
-        path = get_settings().icp_config_path
+        path = settings().icp_config_path
     return ICPConfig.from_yaml(path)

@@ -12,19 +12,41 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     # --- App ---
     app_env: str = "development"
     log_level: str = "INFO"
 
     # --- LLM ---
-    anthropic_api_key: str = ""
-    research_scoring_model: str = "claude-haiku-4-5-20251001"
-    drafting_guardrail_model: str = "claude-sonnet-5"
+    # Gemini API through Google's OpenAI-compatible endpoint.
+    # The existing agents can continue using the OpenAI Python SDK;
+    # only the provider endpoint, API key, and model IDs change.
+    gemini_api_key: str = ""
+    gemini_base_url: str = (
+        "https://generativelanguage.googleapis.com/v1beta/openai/"
+    )
+
+    # --- Dev/testing ---
+    # When true, agents skip the real Gemini call and return canned mock
+    # output instead. Lets you exercise the full pipeline (DB, orchestrator,
+    # frontend) without burning the Gemini free-tier daily quota.
+    mock_llm: bool = False
+
+    # Tiered by task cost/risk:
+    # faster/cheaper model for research + scoring
+    # stronger model for drafting + guardrail
+    research_scoring_model: str = "gemini-3.6-flash"
+    drafting_guardrail_model: str = "gemini-3.6-flash"
 
     # --- Database ---
-    database_url: str = "postgresql+psycopg2://ai_sdr:ai_sdr@localhost:5432/ai_sdr"
+    database_url: str = (
+        "postgresql+psycopg2://ai_sdr:ai_sdr@localhost:5432/ai_sdr"
+    )
 
     # --- Auth ---
     jwt_secret_key: str = "dev-only-change-me"
@@ -35,15 +57,10 @@ class Settings(BaseSettings):
     icp_config_path: str = "configs/icp_ai_native_b2b.yaml"
 
     # --- CORS ---
-    # Comma-separated origins the frontend dashboard is served from. Defaults
-    # cover Vite's dev server (5173) and its production preview server
-    # (4173) — the two ports frontend/ actually runs on locally. An
-    # explicit allow-list instead of "*" is still the right default even
-    # though this API uses bearer tokens (not cookies, so "*" wouldn't be a
-    # CSRF issue here specifically) — it's the pattern that stays correct
-    # if auth ever moves to cookies later, and it's what you'd be expected
-    # to already have in a real deployment.
-    cors_allowed_origins: str = "http://localhost:5173,http://localhost:4173"
+    # Comma-separated origins the frontend dashboard is served from.
+    cors_allowed_origins: str = (
+        "http://localhost:5173,http://localhost:4173"
+    )
 
     @property
     def is_production(self) -> bool:
@@ -51,15 +68,19 @@ class Settings(BaseSettings):
 
     @property
     def cors_allowed_origins_list(self) -> list[str]:
-        return [origin.strip() for origin in self.cors_allowed_origins.split(",") if origin.strip()]
+        return [
+            origin.strip()
+            for origin in self.cors_allowed_origins.split(",")
+            if origin.strip()
+        ]
 
 
 @lru_cache
-def get_settings() -> Settings:
+def settings() -> Settings:
     """
     Cached settings instance. `lru_cache` here means Settings() is only
     constructed once per process (env parsed once), and every module that
-    calls get_settings() gets the same object — standard FastAPI pattern
+    calls settings() gets the same object — standard FastAPI pattern
     for dependency-injected config.
     """
     return Settings()

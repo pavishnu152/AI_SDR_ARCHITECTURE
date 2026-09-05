@@ -23,7 +23,7 @@ export const featuredProject = {
   stack: [
     "FastAPI",
     "LangGraph",
-    "Anthropic Claude (Haiku 4.5 + Sonnet 5)",
+    "Google Gemini (gemini-2.5-flash)",
     "PostgreSQL",
     "SQLAlchemy 2.0",
     "React",
@@ -34,8 +34,7 @@ export const featuredProject = {
   highlights: [
     {
       label: "Tiered model use",
-      detail: "Haiku 4.5 for high-volume research/scoring, Sonnet 5 for higher-stakes drafting/guardrail — not one expensive model for everything.",
-    },
+      detail: "gemini-2.5-flash powers research, scoring, drafting, and guardrail validation through Google's OpenAI-compatible API endpoint.",
     {
       label: "Fail-closed guardrail",
       detail: "An LLM outage during the fact-check step results in a flagged lead for human review, never a silently-approved one.",

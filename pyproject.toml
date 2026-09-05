@@ -11,12 +11,21 @@ dependencies = [
     "sqlalchemy>=2.0",
     "alembic>=1.13",
     "psycopg2-binary>=2.9",
-    "anthropic>=0.34",
+    "openai>=1.50",
     "ddgs>=9.0",
     "beautifulsoup4>=4.12",
     "httpx>=0.27",
     "python-jose[cryptography]>=3.3",
     "passlib[bcrypt]>=1.7",
+    # Pinned below 4.1: passlib 1.7.4 (last released 2020, no newer version
+    # exists) reads bcrypt.__about__.__version__ and runs an internal
+    # self-test (detect_wrap_bug) that both break against bcrypt>=4.1's
+    # changed internals — passlib[bcrypt]'s own unpinned ">=3.1.0" constraint
+    # lets pip resolve the newest bcrypt (5.x) by default, which is what
+    # actually crashed registration with a misleading "password cannot be
+    # longer than 72 bytes" error that had nothing to do with the password
+    # entered. bcrypt 4.0.1 is the last release passlib 1.7.4 fully supports.
+    "bcrypt>=4.0.1,<4.1",
     "python-multipart>=0.0.9",
     "pyyaml>=6.0",
     "email-validator>=2.0",

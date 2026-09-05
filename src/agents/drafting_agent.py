@@ -2,10 +2,9 @@
 Drafting Agent.
 
 Given a company's ResearchOutput and ScoreOutput, writes a short, personalized
-first-touch outreach message. Uses Claude Sonnet 5 (not Haiku) — see
-architecture.md's tiering rationale: this is the highest-stakes, most
-quality-sensitive step in the pipeline (it's the thing a human might
-actually send), so it gets the stronger model.
+first-touch outreach message. Uses the stronger of the two tiered models
+(see src/core/config.py) — this is the highest-stakes, most quality-sensitive
+step in the pipeline (it's the thing a human might actually send).
 
 Same forced-tool_choice pattern as the Scoring Agent, for the same reason:
 one input, one required output shape, no benefit to letting the model
@@ -16,13 +15,18 @@ Guardrail Agent's job, run as a separate, independent LLM call afterward.
 Asking one call to "write persuasively AND self-police for accuracy" pulls
 the model in two directions at once; splitting the roles produces a better
 check than one agent grading its own homework mid-generation.
+
+LLM client: `openai` SDK pointed at Google's Gemini
+OpenAI-compatible endpoint. The provider configuration is centralized
+in src/core/config.py.
 """
+import json
 import time
 from dataclasses import dataclass
 
-import anthropic
+import openai
 
-from src.core.config import get_settings
+from src.core.config import settings
 from src.core.logging import get_agent_logger
 from src.core.pricing import estimate_cost_usd, extract_token_usage
 from src.schemas.lead import DraftOutput, ResearchOutput, ScoreOutput
@@ -48,15 +52,18 @@ Rules:
 Call submit_draft exactly once with the channel ("email") and the message."""
 
 SUBMIT_DRAFT_TOOL = {
-    "name": "submit_draft",
-    "description": "Submit the final outreach draft.",
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "channel": {"type": "string", "enum": ["email", "linkedin"]},
-            "message": {"type": "string"},
+    "type": "function",
+    "function": {
+        "name": "submit_draft",
+        "description": "Submit the final outreach draft.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "channel": {"type": "string", "enum": ["email", "linkedin"]},
+                "message": {"type": "string"},
+            },
+            "required": ["channel", "message"],
         },
-        "required": ["channel", "message"],
     },
 }
 
@@ -99,13 +106,32 @@ def _format_prompt(
         )
     return prompt
 
+def _mock_draft_result(company_name: str) -> DraftingAgentResult:
+    output = DraftOutput(
+        channel="email",
+        message=(
+            f"Hi there,\n\n[MOCK] This is a canned draft for {company_name}, generated with "
+            "Gemini skipped (mock_llm=true).\n\n— The AI SDR team"
+        ),
+    )
+    return DraftingAgentResult(
+        success=True,
+        output=output,
+        model="mock",
+        latency_ms=10,
+        raw_input_summary="[MOCK] drafting input",
+        raw_output_summary=output.message,
+        input_tokens=0,
+        output_tokens=0,
+        cost_usd=0.0,
+    )
 
 def draft_outreach(
     company_name: str,
     research: ResearchOutput,
     score: ScoreOutput,
     *,
-    client: "anthropic.Anthropic | None" = None,
+    client: "openai.OpenAI | None" = None,
     guardrail_feedback: list[str] | None = None,
 ) -> DraftingAgentResult:
     """
@@ -115,22 +141,30 @@ def draft_outreach(
     separate function) since the drafting logic itself is identical; only
     the prompt changes.
     """
-    settings = get_settings()
-    model = settings.drafting_guardrail_model
-    client = client or anthropic.Anthropic(api_key=settings.anthropic_api_key)
+    config = settings()
+    model = config.drafting_guardrail_model
+    if config.mock_llm:
+        logger.info("mock_llm enabled — returning canned draft result")
+        return _mock_draft_result(company_name)
 
+    client = client or openai.OpenAI(
+    base_url=config.gemini_base_url,
+    api_key=config.gemini_api_key,
+)
     user_prompt = _format_prompt(company_name, research, score, guardrail_feedback)
     start = time.perf_counter()
     logger.info("drafting started", extra={"company_name": company_name, "model": model})
 
     try:
-        response = client.messages.create(
+        response = client.chat.completions.create(
             model=model,
             max_tokens=MAX_TOKENS,
-            system=SYSTEM_PROMPT,
             tools=[SUBMIT_DRAFT_TOOL],
-            tool_choice={"type": "tool", "name": "submit_draft"},
-            messages=[{"role": "user", "content": user_prompt}],
+            tool_choice={"type": "function", "function": {"name": "submit_draft"}},
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": user_prompt},
+            ],
         )
     except Exception as exc:  # noqa: BLE001 — see research_agent.py's matching except clause
         latency_ms = int((time.perf_counter() - start) * 1000)
@@ -144,9 +178,10 @@ def draft_outreach(
     input_tokens, output_tokens = extract_token_usage(response)
     cost_usd = estimate_cost_usd(model, input_tokens, output_tokens)
 
-    tool_use_block = next((b for b in response.content if b.type == "tool_use"), None)
-    if tool_use_block is None:
-        logger.error("drafting response had no tool_use block despite forced tool_choice")
+    tool_calls = response.choices[0].message.tool_calls or []
+    tool_call = next((tc for tc in tool_calls if tc.function.name == "submit_draft"), None)
+    if tool_call is None:
+        logger.error("drafting response had no tool call despite forced tool_choice")
         return DraftingAgentResult(
             success=False, output=None, model=model, latency_ms=latency_ms,
             error="model did not call submit_draft despite forced tool_choice",
@@ -154,7 +189,7 @@ def draft_outreach(
         )
 
     try:
-        output = DraftOutput(**tool_use_block.input)
+        output = DraftOutput(**json.loads(tool_call.function.arguments))
     except Exception as exc:  # noqa: BLE001
         logger.error("submit_draft payload invalid", extra={"error": str(exc)})
         return DraftingAgentResult(

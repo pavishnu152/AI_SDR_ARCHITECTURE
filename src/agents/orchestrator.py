@@ -48,7 +48,7 @@ routing* is LangGraph's job here, not retry mechanics. This is a real,
 defensible tradeoff, not an oversight — see the docs file for the full
 comparison including when native RetryPolicy WOULD be the better choice.
 
-Simplification worth naming: runtime dependencies (the Anthropic client,
+Simplification worth naming: runtime dependencies (Gemini/OpenAI-compatible client,
 ICPConfig, tool_impls) are carried directly in the graph's state dict
 rather than routed through LangGraph's separate context/config mechanism.
 That's fine here because this graph runs in-memory with no checkpointer —
@@ -61,7 +61,7 @@ import operator
 import time
 from typing import Annotated, TypedDict
 
-import anthropic
+import openai
 from langgraph.graph import END, START, StateGraph
 
 from src.agents.drafting_agent import DraftingAgentResult, draft_outreach
@@ -69,7 +69,7 @@ from src.agents.guardrail_agent import GuardrailAgentResult, check_draft
 from src.agents.orchestrator_types import AgentInvocationRecord, PipelineResult, call_with_retry
 from src.agents.research_agent import ResearchAgentResult, research_company
 from src.agents.scoring_agent import ScoringAgentResult, score_lead
-from src.core.config import get_settings
+from src.core.config import settings
 from src.core.icp import ICPConfig, get_icp_config
 from src.core.logging import get_agent_logger
 from src.db.models import LeadStatus
@@ -90,7 +90,7 @@ class PipelineState(TypedDict, total=False):
     company_name: str
     domain: str | None
     icp: ICPConfig
-    client: "anthropic.Anthropic"
+    client: "openai.OpenAI"
     research_tool_impls: dict | None
     max_retries: int
 
@@ -323,14 +323,16 @@ def run_pipeline(
     domain: str | None = None,
     *,
     icp: ICPConfig | None = None,
-    client: "anthropic.Anthropic | None" = None,
+    client: "openai.OpenAI | None" = None,
     research_tool_impls: dict | None = None,
     max_retries: int = DEFAULT_MAX_RETRIES,
 ) -> PipelineResult:
-    settings = get_settings()
+    config = settings()
     icp = icp or get_icp_config()
-    client = client or anthropic.Anthropic(api_key=settings.anthropic_api_key)
-
+    client = client or openai.OpenAI(
+    base_url=config.gemini_base_url,
+    api_key=config.gemini_api_key,
+)
     pipeline_start = time.perf_counter()
     logger.info("pipeline started", extra={"company_name": company_name, "domain": domain})
 

@@ -6,7 +6,7 @@ instead of surfacing as a confusing 401 somewhere in tests/api/.
 """
 from jose import jwt
 
-from src.core.config import get_settings
+from src.core.config import settings
 from src.core.security import (
     create_access_token,
     decode_access_token,
@@ -41,16 +41,16 @@ def test_decode_access_token_returns_none_for_garbage_token():
 def test_decode_access_token_returns_none_for_wrong_signature():
     # Signed with a different secret than the app uses — simulates a
     # forged/tampered token, the exact case decode_access_token must reject.
-    settings = get_settings()
+    config = settings()
     forged = jwt.encode(
-        {"sub": "attacker@example.com"}, "wrong-secret-key", algorithm=settings.jwt_algorithm
+        {"sub": "attacker@example.com"}, "wrong-secret-key", algorithm=config.jwt_algorithm
     )
 
     assert decode_access_token(forged) is None
 
 
 def test_decode_access_token_returns_none_for_expired_token():
-    settings = get_settings()
+    config = settings()
     from datetime import datetime, timedelta, timezone
 
     expired_payload = {
@@ -58,7 +58,7 @@ def test_decode_access_token_returns_none_for_expired_token():
         "exp": datetime.now(timezone.utc) - timedelta(minutes=1),
     }
     expired_token = jwt.encode(
-        expired_payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm
+        expired_payload, config.jwt_secret_key, algorithm=config.jwt_algorithm
     )
 
     assert decode_access_token(expired_token) is None

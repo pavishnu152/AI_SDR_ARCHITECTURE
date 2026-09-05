@@ -29,7 +29,7 @@ class WebSearchError(Exception):
     """Raised when the search backend fails after retries are exhausted."""
 
 
-def web_search(query: str, max_results: int = 5) -> list[SearchResult]:
+def web_search(query: str, max_results: int = 3) -> list[SearchResult]:
     """
     Run a web search and return lightweight results (title/url/snippet).
 
@@ -37,6 +37,14 @@ def web_search(query: str, max_results: int = 5) -> list[SearchResult]:
     tool (`fetch_page`) so the agent can decide which results are worth the
     extra latency/token cost of a full fetch, instead of always paying for
     every result's full page text.
+
+    max_results default lowered from 5 to 3: fewer results per search call
+    means a smaller JSON payload appended to the growing conversation on
+    # every turn, which matters because large cumulative prompts
+    # increase latency and token usage.
+    context was observed pushing runs into heavy token-per-minute rate
+    limiting (see page_fetch.py's MAX_CONTENT_CHARS comment for the same
+    story on the fetch side).
     """
     try:
         with DDGS() as ddgs:

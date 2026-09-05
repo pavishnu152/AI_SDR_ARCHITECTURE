@@ -2,7 +2,7 @@
 Tests for the Orchestrator's state machine logic.
 
 Note the testing strategy: we mock the AGENT FUNCTIONS (research_company,
-score_lead, draft_outreach, check_draft), not the Anthropic client. Each
+score_lead, draft_outreach, check_draft), not the Gemini/OpenAI-compatible client. Each
 agent already has its own unit tests covering its internal LLM-calling
 logic (test_research_agent.py, test_scoring_agent.py, etc.) — re-mocking
 the LLM here would just duplicate that coverage while making these tests
@@ -32,14 +32,14 @@ def _research_ok(**kwargs):
         sources=["https://x"],
     )
     return ResearchAgentResult(
-        success=True, output=output, model="claude-haiku-4-5-20251001",
+        success=True, output=output, model="openai/gpt-oss-20b",
         latency_ms=100, turns_used=2, input_tokens=1000, output_tokens=200, cost_usd=0.002,
     )
 
 
 def _research_fail(error="search backend down"):
     return ResearchAgentResult(
-        success=False, output=None, model="claude-haiku-4-5-20251001",
+        success=False, output=None, model="openai/gpt-oss-20b",
         latency_ms=50, turns_used=1, error=error,
     )
 
@@ -47,7 +47,7 @@ def _research_fail(error="search backend down"):
 def _score(value: int):
     output = ScoreOutput(score=value, confidence=0.8, reasoning="Based on funding signal.")
     return ScoringAgentResult(
-        success=True, output=output, model="claude-haiku-4-5-20251001", latency_ms=80,
+        success=True, output=output, model="openai/gpt-oss-20b", latency_ms=80,
         input_tokens=400, output_tokens=60, cost_usd=0.0007,
     )
 
@@ -55,7 +55,7 @@ def _score(value: int):
 def _draft_ok():
     output = DraftOutput(channel="email", message="Congrats on your $12M Series A!")
     return DraftingAgentResult(
-        success=True, output=output, model="claude-sonnet-5", latency_ms=200,
+        success=True, output=output, model="openai/gpt-oss-120b", latency_ms=200,
         input_tokens=300, output_tokens=100, cost_usd=0.0016,
     )
 
@@ -65,7 +65,7 @@ def _guardrail(approved: bool, claims=None):
         approved=approved, unsupported_claims=claims or [], notes="checked against research"
     )
     return GuardrailAgentResult(
-        success=True, output=output, model="claude-sonnet-5", latency_ms=150,
+        success=True, output=output, model="openai/gpt-oss-120b", latency_ms=150,
         input_tokens=350, output_tokens=90, cost_usd=0.0016,
     )
 
@@ -199,7 +199,7 @@ def test_pipeline_flags_when_recheck_itself_technically_fails(
     mock_guardrail.side_effect = [
         _guardrail(approved=False, claims=["claim A"]),
         GuardrailAgentResult(
-            success=False, output=None, model="claude-sonnet-5", latency_ms=50,
+            success=False, output=None, model="openai/gpt-oss-120b", latency_ms=50,
             error="LLM call failed: connection reset",
         ),
     ]
@@ -259,7 +259,7 @@ def test_pipeline_fails_closed_when_guardrail_itself_errors(
     mock_score.return_value = _score(85)
     mock_draft.return_value = _draft_ok()
     mock_guardrail.return_value = GuardrailAgentResult(
-        success=False, output=None, model="claude-sonnet-5", latency_ms=50,
+        success=False, output=None, model="openai/gpt-oss-120b", latency_ms=50,
         error="LLM call failed: connection reset",
     )
 
@@ -278,7 +278,7 @@ def test_pipeline_fails_when_scoring_exhausts_retries(
 ):
     mock_research.return_value = _research_ok()
     mock_score.return_value = ScoringAgentResult(
-        success=False, output=None, model="claude-haiku-4-5-20251001", latency_ms=50,
+        success=False, output=None, model="openai/gpt-oss-20b", latency_ms=50,
         error="LLM call failed: rate limited",
     )
 
@@ -300,7 +300,7 @@ def test_pipeline_fails_when_drafting_exhausts_retries(
     mock_research.return_value = _research_ok()
     mock_score.return_value = _score(85)
     mock_draft.return_value = DraftingAgentResult(
-        success=False, output=None, model="claude-sonnet-5", latency_ms=50,
+        success=False, output=None, model="openai/gpt-oss-120b", latency_ms=50,
         error="LLM call failed: timeout",
     )
 
@@ -331,7 +331,7 @@ def test_pipeline_flags_when_revision_draft_itself_fails(
     mock_draft.side_effect = [
         _draft_ok(),  # initial draft
         DraftingAgentResult(  # revision attempt fails technically
-            success=False, output=None, model="claude-sonnet-5", latency_ms=50,
+            success=False, output=None, model="openai/gpt-oss-120b", latency_ms=50,
             error="LLM call failed: timeout",
         ),
     ]

@@ -15,7 +15,17 @@ from bs4 import BeautifulSoup
 
 logger = logging.getLogger("tools.page_fetch")
 
-MAX_CONTENT_CHARS = 6000
+# Cut from 6000 to 2500: keep fetched content bounded to reduce
+# cumulative LLM token usage and latency.
+# calls-per-minute AND tokens-per-minute. A single research run that fetches
+# 3-4 pages at 6000 chars each (~1500 tokens per page) plus several rounds
+# of search results was pushing cumulative conversation size past 40k input
+# tokens by the end of a run — observed directly (a "rubixe" lead's two
+# research attempts used 42,956 and 48,500 input tokens each, ~5-6 minutes
+# of latency, mostly spent in 429 rate-limit backoff). 2500 chars is still
+# enough to extract funding/hiring/product signals from a normal page, at
+# roughly 40% of the previous token cost per fetch.
+MAX_CONTENT_CHARS = 2500
 REQUEST_TIMEOUT_SECONDS = 10
 USER_AGENT = "ai-sdr-research-agent/0.1 (portfolio project; contact: pavishnu15btechit@gmail.com)"
 

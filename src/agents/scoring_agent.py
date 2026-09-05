@@ -11,8 +11,8 @@ Design decisions worth understanding:
    "auto" because it genuinely needs to decide, turn by turn, whether to
    search, fetch, or submit. The Scoring Agent has no such decision to
    make — it always receives research and always must produce a score in
-   one shot. Forcing tool_choice={"type": "tool", "name": "submit_score"}
-   means the model has no path to reply with a bare text answer, no risk of
+   one shot. Forcing tool_choice to the submit_score function means the
+   model has no path to reply with a bare text answer, no risk of
    "let me think about this..." prose leaking into what should be a single
    structured call. Use "auto" when the model needs to choose an action;
    force a specific tool when there is exactly one valid response shape.
@@ -20,19 +20,25 @@ Design decisions worth understanding:
 2. No web/search tools available here at all — deliberately. The Scoring
    Agent should reason ONLY over what the Research Agent already found, not
    go re-research on its own. This keeps responsibilities cleanly separated
-   (see architecture.md) and makes scoring fast/cheap (a single Haiku call,
-   no multi-turn tool loop, no extra latency or cost).
+   (see architecture.md) and makes scoring fast/cheap (a single small-model
+   call, no multi-turn tool loop, no extra latency or cost).
 
 3. The ICP is injected as data (ICPConfig.as_prompt_block()), not
    hardcoded into this file's prompt string. Change the YAML, the scoring
    rubric changes — no code edit, no redeploy.
+
+4. LLM client: `openai` SDK pointed at Google's Gemini
+   OpenAI-compatible endpoint. The provider endpoint, API key, and model
+   are centralized in src/core/config.py so the scoring logic remains
+   provider-independent.
 """
+import json
 import time
 from dataclasses import dataclass
 
-import anthropic
+import openai
 
-from src.core.config import get_settings
+from src.core.config import settings
 from src.core.icp import ICPConfig, get_icp_config
 from src.core.logging import get_agent_logger
 from src.core.pricing import estimate_cost_usd, extract_token_usage
@@ -56,19 +62,22 @@ of politeness.
 Call submit_score exactly once with your score (0-100), confidence (0.0-1.0), and reasoning."""
 
 SUBMIT_SCORE_TOOL = {
-    "name": "submit_score",
-    "description": "Submit the final ICP fit score for this lead.",
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "score": {"type": "integer", "minimum": 0, "maximum": 100},
-            "confidence": {"type": "number", "minimum": 0.0, "maximum": 1.0},
-            "reasoning": {
-                "type": "string",
-                "description": "Must reference specific signals from the research provided.",
+    "type": "function",
+    "function": {
+        "name": "submit_score",
+        "description": "Submit the final ICP fit score for this lead.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "score": {"type": "integer", "minimum": 0, "maximum": 100},
+                "confidence": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+                "reasoning": {
+                    "type": "string",
+                    "description": "Must reference specific signals from the research provided.",
+                },
             },
+            "required": ["score", "confidence", "reasoning"],
         },
-        "required": ["score", "confidence", "reasoning"],
     },
 }
 
@@ -97,18 +106,44 @@ def _format_research_for_prompt(research: ResearchOutput) -> str:
         f"Sources consulted: {', '.join(research.sources) or '(none)'}"
     )
 
+def _mock_score_result(research: ResearchOutput) -> ScoringAgentResult:
+    output = ScoreOutput(
+        score=75,
+        confidence=0.6,
+        reasoning=(
+            "[MOCK] Scored based on canned test data (Gemini call skipped). "
+            f"Research had {len(research.signals)} signal(s)."
+        ),
+    )
+    return ScoringAgentResult(
+        success=True,
+        output=output,
+        model="mock",
+        latency_ms=10,
+        raw_input_summary="[MOCK] scoring input",
+        raw_output_summary=output.reasoning,
+        input_tokens=0,
+        output_tokens=0,
+        cost_usd=0.0,
+    )
 
 def score_lead(
     research: ResearchOutput,
     icp: ICPConfig | None = None,
     *,
-    client: "anthropic.Anthropic | None" = None,
+    client: "openai.OpenAI | None" = None,
 ) -> ScoringAgentResult:
-    settings = get_settings()
+    config = settings()
     icp = icp or get_icp_config()
-    model = settings.research_scoring_model
-    client = client or anthropic.Anthropic(api_key=settings.anthropic_api_key)
+    model = config.research_scoring_model
+    if config.mock_llm:
+        logger.info("mock_llm enabled — returning canned score result")
+        return _mock_score_result(research)
 
+    client = client or openai.OpenAI(
+    base_url=config.gemini_base_url,
+    api_key=config.gemini_api_key,
+)
     system_prompt = SYSTEM_PROMPT_TEMPLATE.format(icp_block=icp.as_prompt_block())
     user_prompt = _format_research_for_prompt(research)
 
@@ -116,13 +151,15 @@ def score_lead(
     logger.info("scoring started", extra={"icp_name": icp.name, "model": model})
 
     try:
-        response = client.messages.create(
+        response = client.chat.completions.create(
             model=model,
             max_tokens=MAX_TOKENS,
-            system=system_prompt,
             tools=[SUBMIT_SCORE_TOOL],
-            tool_choice={"type": "tool", "name": "submit_score"},
-            messages=[{"role": "user", "content": user_prompt}],
+            tool_choice="auto",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
         )
     except Exception as exc:  # noqa: BLE001 — see research_agent.py's matching except clause
         latency_ms = int((time.perf_counter() - start) * 1000)
@@ -139,9 +176,10 @@ def score_lead(
     input_tokens, output_tokens = extract_token_usage(response)
     cost_usd = estimate_cost_usd(model, input_tokens, output_tokens)
 
-    tool_use_block = next((b for b in response.content if b.type == "tool_use"), None)
-    if tool_use_block is None:
-        logger.error("scoring response had no tool_use block despite forced tool_choice")
+    tool_calls = response.choices[0].message.tool_calls or []
+    tool_call = next((tc for tc in tool_calls if tc.function.name == "submit_score"), None)
+    if tool_call is None:
+        logger.error("scoring response had no tool call despite forced tool_choice")
         return ScoringAgentResult(
             success=False,
             output=None,
@@ -154,7 +192,7 @@ def score_lead(
         )
 
     try:
-        output = ScoreOutput(**tool_use_block.input)
+        output = ScoreOutput(**json.loads(tool_call.function.arguments))
     except Exception as exc:  # noqa: BLE001 — malformed structured output is a real failure mode
         logger.error("submit_score payload invalid", extra={"error": str(exc)})
         return ScoringAgentResult(

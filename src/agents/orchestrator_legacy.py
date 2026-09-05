@@ -21,6 +21,17 @@ Deleting working code the moment you refactor it is normal in a real repo
 a commit, because this project's whole point is to be read and explained,
 not just to work.
 
+Provider note: this file was frozen at Milestone 10, when the pipeline
+still ran on Anthropic Claude. Milestone "LLM provider migration" swapped every
+live agent (research/scoring/drafting/guardrail) plus this file's own
+client wiring from `anthropic.Anthropic` to `openai.OpenAI` pointed at
+Gemini's OpenAI-compatible endpoint, purely so this dead file doesn't import a package that's
+no longer a project dependency and doesn't silently break if anyone ever
+does import it. The actual orchestration logic below — retries, the
+reject-early gate, the guardrail self-correction loop — is unchanged from
+Milestone 10; only the LLM client construction moved with the rest of the
+codebase.
+
 Original module docstring follows unchanged below.
 ---
 
@@ -36,18 +47,19 @@ exact file to LangGraph with a documented before/after comparison.
 
 Key design decisions:
 
-1. A single shared `anthropic.Anthropic` client is created once and passed
-   into every agent call, instead of each agent creating its own. Client
-   objects hold an HTTP connection pool — creating a fresh one per call
-   wastes a TCP/TLS handshake on every single agent invocation across a
-   4-agent pipeline. This is a real production cost, not just tidiness.
+1. A single shared LLM client is created once and passed into every agent
+   call, instead of each agent creating its own. Client objects hold an
+   HTTP connection pool — creating a fresh one per call wastes a TCP/TLS
+   handshake on every single agent invocation across a 4-agent pipeline.
+   This is a real production cost, not just tidiness.
 
 2. Reject-early gate: if the Scoring Agent returns a score at or below
-   icp.score_thresholds.reject, the pipeline stops BEFORE drafting. Sonnet
-   calls (drafting + guardrail) are the most expensive part of this
-   pipeline — there's no reason to pay for a personalized draft for a lead
-   that already failed fit scoring. This is a direct cost-optimization
-   decision, and a good one to be able to defend in interviews.
+   icp.score_thresholds.reject, the pipeline stops BEFORE drafting. The
+   drafting + guardrail calls run on the stronger tiered model and are the
+   most expensive part of this pipeline — there's no reason to pay for a
+   personalized draft for a lead that already failed fit scoring. This is
+   a direct cost-optimization decision, and a good one to be able to
+   defend in interviews.
 
 3. Per-stage retries (transient failure recovery) are a SEPARATE concept
    from the guardrail self-correction loop (a business-logic response to a
@@ -62,14 +74,14 @@ Key design decisions:
 """
 import time
 
-import anthropic
+import openai
 
 from src.agents.drafting_agent import DraftingAgentResult, draft_outreach
 from src.agents.guardrail_agent import GuardrailAgentResult, check_draft
 from src.agents.orchestrator_types import AgentInvocationRecord, PipelineResult, call_with_retry
 from src.agents.research_agent import ResearchAgentResult, research_company
 from src.agents.scoring_agent import ScoringAgentResult, score_lead
-from src.core.config import get_settings
+from src.core.config import settings
 from src.core.icp import ICPConfig, get_icp_config
 from src.core.logging import get_agent_logger
 from src.db.models import LeadStatus
@@ -89,14 +101,16 @@ def run_pipeline(
     domain: str | None = None,
     *,
     icp: ICPConfig | None = None,
-    client: "anthropic.Anthropic | None" = None,
+    client: "openai.OpenAI | None" = None,
     research_tool_impls: dict | None = None,
     max_retries: int = DEFAULT_MAX_RETRIES,
 ) -> PipelineResult:
-    settings = get_settings()
+    config = settings()
     icp = icp or get_icp_config()
-    client = client or anthropic.Anthropic(api_key=settings.anthropic_api_key)
-
+    client = client or openai.OpenAI(
+    base_url=config.gemini_base_url,
+    api_key=config.gemini_api_key,
+)
     invocation_log: list[AgentInvocationRecord] = []
     pipeline_start = time.perf_counter()
 
@@ -141,7 +155,7 @@ def run_pipeline(
         )
     score_output = score_result.output
 
-    # --- Reject-early gate: don't spend Sonnet calls on a bad-fit lead ---
+    # --- Reject-early gate: don't spend drafting/guardrail calls on a bad-fit lead ---
     if score_output.score <= icp.score_thresholds.reject:
         logger.info(
             "lead rejected by score gate, skipping drafting",

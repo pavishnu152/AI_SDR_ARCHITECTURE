@@ -14,11 +14,11 @@ from src.api.auth import router as auth_router
 from src.api.health import router as health_router
 from src.api.leads import router as leads_router
 from src.api.middleware import RequestIDMiddleware
-from src.core.config import get_settings
+from src.core.config import settings
 from src.core.logging import configure_logging
 
-settings = get_settings()
-configure_logging(settings.log_level)
+config = settings()
+configure_logging(config.log_level)
 
 app = FastAPI(
     title="AI SDR — Multi-Agent Lead Research & Qualification",
@@ -28,7 +28,7 @@ app = FastAPI(
 app.add_middleware(RequestIDMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_allowed_origins_list,
+    allow_origins=config.cors_allowed_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

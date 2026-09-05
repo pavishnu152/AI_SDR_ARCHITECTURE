@@ -2,7 +2,7 @@
 API tests for the /leads endpoints. `run_pipeline` is mocked at the
 lead_service import site — these tests verify the API/DB/auth wiring, not
 agent behavior (that's covered by tests/agents/test_orchestrator.py and
-each agent's own tests). No real Anthropic API calls happen here.
+each agent's own tests). No real Gemini API calls happen here.
 """
 from unittest.mock import patch
 
@@ -28,7 +28,7 @@ def _fake_ready_pipeline_result(company_name: str) -> PipelineResult:
         guardrail_output=GuardrailVerdict(approved=True, unsupported_claims=[], notes="ok"),
         invocation_log=[
             AgentInvocationRecord(
-                agent_name="research", model="claude-haiku-4-5-20251001", latency_ms=100,
+                agent_name="research", model="openai/gpt-oss-20b", latency_ms=100,
                 success=True, error=None, attempt=1,
             ),
         ],
@@ -138,7 +138,7 @@ def test_get_lead_logs_returns_invocation_trail(mock_run_pipeline, client, auth_
     logs = response.json()
     assert len(logs) == 1
     assert logs[0]["agent_name"] == "research"
-    assert logs[0]["model_used"] == "claude-haiku-4-5-20251001"
+    assert logs[0]["model_used"] == "openai/gpt-oss-20b"
     assert logs[0]["success"] is True
 
 

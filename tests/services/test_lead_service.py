@@ -45,12 +45,12 @@ def _ready_result() -> PipelineResult:
         guardrail_output=GuardrailVerdict(approved=True, unsupported_claims=[], notes="ok"),
         invocation_log=[
             AgentInvocationRecord(
-                agent_name="research", model="claude-haiku-4-5-20251001", latency_ms=100,
+                agent_name="research", model="openai/gpt-oss-20b", latency_ms=100,
                 success=True, error=None, attempt=1, input_tokens=500, output_tokens=100,
                 cost_usd=0.001,
             ),
             AgentInvocationRecord(
-                agent_name="scoring", model="claude-haiku-4-5-20251001", latency_ms=80,
+                agent_name="scoring", model="openai/gpt-oss-20b", latency_ms=80,
                 success=True, error=None, attempt=1, input_tokens=300, output_tokens=50,
                 cost_usd=0.0005,
             ),
@@ -72,7 +72,7 @@ def _rejected_result() -> PipelineResult:
         guardrail_output=None,
         invocation_log=[
             AgentInvocationRecord(
-                agent_name="research", model="claude-haiku-4-5-20251001", latency_ms=90,
+                agent_name="research", model="openai/gpt-oss-20b", latency_ms=90,
                 success=True, error=None, attempt=1, cost_usd=0.001,
             ),
         ],

@@ -7,12 +7,12 @@ Health check endpoint. Trivial on purpose right now — it exists so:
 """
 from fastapi import APIRouter
 
-from src.core.config import get_settings
+from src.core.config import settings
 
 router = APIRouter(tags=["health"])
 
 
 @router.get("/health")
 def health_check() -> dict:
-    settings = get_settings()
-    return {"status": "ok", "env": settings.app_env}
+    config = settings()
+    return {"status": "ok", "env": config.app_env}

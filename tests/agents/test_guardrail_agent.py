@@ -8,11 +8,12 @@ reads `.output.approved` would otherwise crash instead of silently
 approving a draft. This is exactly the kind of thing to actually assert,
 not just claim in a docstring.
 """
+import json
 from dataclasses import dataclass
 from unittest.mock import MagicMock
 
-import anthropic
 import httpx
+import openai
 import pytest
 
 from src.agents.guardrail_agent import check_draft
@@ -20,16 +21,35 @@ from src.schemas.lead import DraftOutput, ResearchOutput, Signal
 
 
 @dataclass
-class FakeBlock:
-    type: str
-    id: str = ""
-    name: str = ""
-    input: dict = None
+class FakeFunction:
+    name: str
+    arguments: str
+
+
+@dataclass
+class FakeToolCall:
+    id: str
+    function: FakeFunction
+
+
+@dataclass
+class FakeMessage:
+    content: str | None = None
+    tool_calls: list | None = None
+
+
+@dataclass
+class FakeChoice:
+    message: FakeMessage
 
 
 @dataclass
 class FakeResponse:
-    content: list
+    choices: list
+
+
+def _tool_call(call_id: str, name: str, payload: dict) -> FakeToolCall:
+    return FakeToolCall(id=call_id, function=FakeFunction(name=name, arguments=json.dumps(payload)))
 
 
 @pytest.fixture
@@ -53,21 +73,29 @@ def test_check_draft_approves_when_claims_are_supported(sample_research):
         message="Congrats on the $12M Series A — curious if you're exploring AI SDR tools?",
     )
     fake_response = FakeResponse(
-        content=[
-            FakeBlock(
-                type="tool_use",
-                id="tu_1",
-                name="submit_verdict",
-                input={
-                    "approved": True,
-                    "unsupported_claims": [],
-                    "notes": "The $12M Series A claim matches the research signal directly.",
-                },
+        choices=[
+            FakeChoice(
+                message=FakeMessage(
+                    tool_calls=[
+                        _tool_call(
+                            "tu_1",
+                            "submit_verdict",
+                            {
+                                "approved": True,
+                                "unsupported_claims": [],
+                                "notes": (
+                                    "The $12M Series A claim matches the research signal "
+                                    "directly."
+                                ),
+                            },
+                        )
+                    ]
+                )
             )
         ]
     )
     client = MagicMock()
-    client.messages.create.return_value = fake_response
+    client.chat.completions.create.return_value = fake_response
 
     result = check_draft(sample_research, draft, client=client)
 
@@ -82,24 +110,32 @@ def test_check_draft_flags_unsupported_claims(sample_research):
         message="Congrats on your $50M Series C and your 200-person engineering team!",
     )
     fake_response = FakeResponse(
-        content=[
-            FakeBlock(
-                type="tool_use",
-                id="tu_1",
-                name="submit_verdict",
-                input={
-                    "approved": False,
-                    "unsupported_claims": [
-                        "$50M Series C",
-                        "200-person engineering team",
-                    ],
-                    "notes": "Research only supports a $12M Series A; no headcount data exists.",
-                },
+        choices=[
+            FakeChoice(
+                message=FakeMessage(
+                    tool_calls=[
+                        _tool_call(
+                            "tu_1",
+                            "submit_verdict",
+                            {
+                                "approved": False,
+                                "unsupported_claims": [
+                                    "$50M Series C",
+                                    "200-person engineering team",
+                                ],
+                                "notes": (
+                                    "Research only supports a $12M Series A; no headcount data "
+                                    "exists."
+                                ),
+                            },
+                        )
+                    ]
+                )
             )
         ]
     )
     client = MagicMock()
-    client.messages.create.return_value = fake_response
+    client.chat.completions.create.return_value = fake_response
 
     result = check_draft(sample_research, draft, client=client)
 
@@ -111,8 +147,8 @@ def test_check_draft_flags_unsupported_claims(sample_research):
 def test_check_draft_fails_closed_on_api_error(sample_research):
     draft = DraftOutput(channel="email", message="Hello there.")
     client = MagicMock()
-    client.messages.create.side_effect = anthropic.APIConnectionError(
-        request=httpx.Request("POST", "https://api.anthropic.com/v1/messages")
+    client.chat.completions.create.side_effect = openai.APIConnectionError(
+        request=httpx.Request("POST", "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions")
     )
 
     result = check_draft(sample_research, draft, client=client)
@@ -127,7 +163,9 @@ def test_check_draft_fails_closed_on_api_error(sample_research):
 def test_check_draft_handles_missing_tool_use_block(sample_research):
     draft = DraftOutput(channel="email", message="Hello there.")
     client = MagicMock()
-    client.messages.create.return_value = FakeResponse(content=[])
+    client.chat.completions.create.return_value = FakeResponse(
+        choices=[FakeChoice(message=FakeMessage(tool_calls=[]))]
+    )
 
     result = check_draft(sample_research, draft, client=client)
 
@@ -139,11 +177,17 @@ def test_check_draft_handles_invalid_payload(sample_research):
     # Missing the required "notes" key — GuardrailVerdict validation must fail.
     draft = DraftOutput(channel="email", message="Hello there.")
     client = MagicMock()
-    client.messages.create.return_value = FakeResponse(
-        content=[
-            FakeBlock(
-                type="tool_use", id="tu_1", name="submit_verdict",
-                input={"approved": True, "unsupported_claims": []},
+    client.chat.completions.create.return_value = FakeResponse(
+        choices=[
+            FakeChoice(
+                message=FakeMessage(
+                    tool_calls=[
+                        _tool_call(
+                            "tu_1", "submit_verdict",
+                            {"approved": True, "unsupported_claims": []},
+                        )
+                    ]
+                )
             )
         ]
     )

@@ -1,222 +1,1214 @@
-# AI SDR — Multi-Agent Sales Lead Research & Qualification System
-### Milestone 1: Problem Definition & Architecture Design
+# AI SDR — System Architecture
+
+## 1. System Overview
+
+The AI SDR is a production-oriented, multi-agent sales development system designed to research companies, evaluate them against a configurable Ideal Customer Profile (ICP), generate personalized outreach, and independently verify the generated content before it is marked ready to send.
+
+The system follows a gated agent workflow:
+
+Research → Score → Reject Early → Draft → Guardrail → Self-Correction → Ready
+
+The architecture separates:
+
+- API and authentication
+- Agent orchestration
+- Individual agent responsibilities
+- External tools
+- Database persistence
+- LLM provider configuration
+- Evaluation
+- Deployment infrastructure
+
+The goal is to demonstrate production-style AI engineering rather than a simple LLM wrapper.
 
 ---
 
-## 1. Problem Definition
+## 2. High-Level Architecture
 
-**Statement:** Given a target company/lead, autonomously research it, score its fit against a defined Ideal Customer Profile (ICP), and produce a personalized, factually-grounded outreach draft — with every agent decision logged for human review before anything is sent.
+```text
+                         ┌──────────────────────────┐
+                         │        React UI           │
+                         │     Vite + TypeScript     │
+                         └────────────┬─────────────┘
+                                      │
+                                      │ HTTP / JWT
+                                      ▼
+                         ┌──────────────────────────┐
+                         │       FastAPI API         │
+                         │                          │
+                         │ Authentication           │
+                         │ Lead Management          │
+                         │ Run Management           │
+                         │ Health Checks            │
+                         └────────────┬─────────────┘
+                                      │
+                                      ▼
+                         ┌──────────────────────────┐
+                         │       LangGraph           │
+                         │    Agent Orchestrator     │
+                         └────────────┬─────────────┘
+                                      │
+                 ┌────────────────────┼────────────────────┐
+                 │                    │                    │
+                 ▼                    ▼                    ▼
+        ┌────────────────┐   ┌────────────────┐   ┌────────────────┐
+        │ Research Agent │   │ Scoring Agent  │   │ Drafting Agent │
+        └───────┬────────┘   └────────────────┘   └───────┬────────┘
+                │                                          │
+                ▼                                          ▼
+        ┌────────────────┐                         ┌────────────────┐
+        │ Search / Fetch │                         │ Guardrail Agent│
+        │    Tools       │                         └────────────────┘
+        └────────────────┘                                  │
+                                                            ▼
+                                                  ┌──────────────────┐
+                                                  │ Self-Correction  │
+                                                  │      Loop        │
+                                                  └──────────────────┘
 
-**Why this scope:** Real AI SDR products (Clay, Artisan, 11x) do exactly this loop. Scoping to research → score → draft → guardrail keeps it buildable solo on CPU-only hardware in ~2 weeks while still being a legitimate product, not a toy.
+                                      │
+                                      ▼
+                         ┌──────────────────────────┐
+                         │       PostgreSQL          │
+                         │                          │
+                         │ Users                    │
+                         │ Leads                    │
+                         │ Runs                     │
+                         │ Agent Results             │
+                         └──────────────────────────┘
 
-**Explicit non-goals (for now, listed under Future Improvements):** no email-sending integration, no CRM sync, no multi-tenant billing. These are believable "V2" additions — good interview talking points, bad use of limited build time.
+                                      │
+                                      ▼
+                         ┌──────────────────────────┐
+                         │       Google Gemini       │
+                         │      gemini-2.5-flash     │
+                         │                          │
+                         │ OpenAI-compatible API     │
+                         └──────────────────────────┘
+3. Core Workflow
 
-**Target user:** An SDR/sales manager who uploads a list of leads and gets back scored, researched, drafted outreach to review — not to blindly auto-send.
+Each lead moves through a controlled multi-agent workflow.
 
----
+START
+  │
+  ▼
+Research
+  │
+  ▼
+Score
+  │
+  ▼
+ICP Gate
+  │
+  ├──────────────► REJECT
+  │
+  ▼
+Draft
+  │
+  ▼
+Guardrail
+  │
+  ├──────────────► FAIL
+  │                    │
+  │                    ▼
+  │              Self-Correction
+  │                    │
+  │                    ▼
+  │              Guardrail Again
+  │
+  ▼
+READY
 
-## 2. Success Metrics
+The workflow intentionally rejects unsuitable leads before spending additional LLM usage on drafting and validation.
 
-| Metric | Target | Why it matters |
-|---|---|---|
-| Lead scoring agreement vs. human-labeled eval set | >80% | Proves the scoring logic isn't random — this is your "model evaluation" equivalent |
-| Ungrounded/hallucinated claims in drafts | ~0% | Production LLM systems are judged on grounding, not fluency |
-| End-to-end latency per lead | <30s | Shows you thought about UX/production latency, not just correctness |
-| Agent decision traceability | 100% logged | Explainability requirement — every score/draft must show its reasoning chain |
+4. Technology Stack
+Layer	Technology	Purpose
+Frontend	React	Dashboard UI
+Frontend Build	Vite	Frontend development/build
+Frontend Language	TypeScript	Type-safe frontend development
+Styling	Tailwind CSS	UI styling
+Backend	FastAPI	REST API
+Agent Orchestration	LangGraph	Stateful multi-agent workflow
+LLM	Google Gemini API	Research, scoring, drafting and guardrail reasoning
+LLM Model	gemini-2.5-flash	Current production model
+LLM SDK	OpenAI Python SDK	Access Gemini through its OpenAI-compatible endpoint
+Database	PostgreSQL	Persistent application data
+ORM	SQLAlchemy	Database abstraction
+Migrations	Alembic	Database schema migrations
+Authentication	JWT	Stateless API authentication
+Containerization	Docker	Reproducible deployment
+CI	GitHub Actions	Automated validation
+Testing	Pytest	Automated testing
+Linting	Ruff	Code quality
+Evaluation	Synthetic evaluation harness	Agent quality measurement
+Deployment	Render	Backend deployment
+Frontend Deployment	Vercel	Frontend hosting
+5. Backend Architecture
 
----
+The backend is structured around clear separation of concerns.
 
-## 3. Agent Architecture
+src/
+├── agents/
+│   ├── research_agent.py
+│   ├── scoring_agent.py
+│   ├── drafting_agent.py
+│   └── guardrail_agent.py
+│
+├── api/
+│   ├── auth.py
+│   ├── leads.py
+│   ├── runs.py
+│   └── health.py
+│
+├── core/
+│   ├── config.py
+│   ├── database.py
+│   ├── security.py
+│   └── pricing.py
+│
+├── db/
+│   ├── models.py
+│   └── repositories.py
+│
+├── graph/
+│   └── workflow.py
+│
+├── schemas/
+│   ├── auth.py
+│   ├── leads.py
+│   └── runs.py
+│
+├── tools/
+│   ├── web_search.py
+│   └── page_fetch.py
+│
+├── eval/
+│   └── run_eval.py
+│
+└── main.py
 
-```
-                     ┌─────────────────┐
-   Lead (company)───▶│   Orchestrator   │  (state machine, retries, persistence)
-                     └────────┬─────────┘
-                              │
-              ┌───────────────┼────────────────┐
-              ▼                                 
-     ┌─────────────────┐                        
-     │ Research Agent   │  tools: web_search, page_fetch
-     │ → LeadProfile    │  output: structured company facts, signals, news
-     └────────┬─────────┘
+The architecture keeps business logic out of the API routes wherever possible.
+
+6. Agent Responsibilities
+6.1 Research Agent
+
+The Research Agent gathers factual information about the target company.
+
+Responsibilities:
+
+Search for company information
+Retrieve relevant web pages
+Extract useful company facts
+Identify company size and industry
+Identify products or services
+Identify relevant business signals
+Produce structured research output
+Preserve source URLs where applicable
+
+The Research Agent should focus on evidence gathering rather than deciding whether the company is a good prospect.
+
+Inputs
+Company name
+Company domain
+Optional lead metadata
+Outputs
+Company overview
+Industry
+Employee/company-size signals
+Products/services
+Business signals
+Evidence
+Source URLs
+Research confidence
+7. Scoring Agent
+
+The Scoring Agent evaluates the researched company against the configured ICP.
+
+The scoring process is configurable rather than hard-coded to a single company.
+
+Example ICP dimensions:
+
+Industry
+Company size
+Geography
+Technology signals
+Business model
+Funding/growth signals
+Relevant pain points
+
+The agent produces a structured score and explanation.
+
+Example:
+
+{
+  "score": 82,
+  "fit": "strong",
+  "reasons": [
+    "Matches target industry",
+    "Company size is within ICP range",
+    "Strong technology adoption signals"
+  ]
+}
+
+The scoring stage is intentionally separated from research so that evidence collection and business qualification remain independent responsibilities.
+
+8. Reject-Early Gate
+
+After scoring, the workflow evaluates whether the lead should continue.
+
+Score >= threshold
+        │
+        ├── YES ──► Draft
+        │
+        └── NO ───► Reject
+
+The threshold is configurable.
+
+Example:
+
+Minimum ICP score = 60
+
+A lead scoring below the threshold is rejected before drafting.
+
+This prevents unnecessary downstream LLM usage and avoids generating outreach for poor-fit companies.
+
+9. Drafting Agent
+
+The Drafting Agent generates personalized outreach only for qualified leads.
+
+Inputs include:
+
+Company research
+ICP score
+ICP reasoning
+Relevant company signals
+Target persona
+Outreach configuration
+
+The draft should:
+
+Reference verified company information
+Explain a relevant business problem
+Avoid generic personalization
+Maintain professional tone
+Include a clear call to action
+Avoid unsupported claims
+
+Example output structure:
+
+{
+  "subject": "...",
+  "body": "...",
+  "personalization_points": [
+    "..."
+  ]
+}
+10. Guardrail Agent
+
+The Guardrail Agent independently reviews the generated outreach.
+
+It should not simply trust the Drafting Agent.
+
+The guardrail checks for:
+
+Factual accuracy
+
+Are company claims supported by research?
+
+Unsupported claims
+
+Does the message invent:
+
+products
+customers
+funding
+partnerships
+metrics
+executives
+business initiatives
+Personalization quality
+
+Does the message use actual company-specific evidence?
+
+Sales quality
+
+Does the message contain:
+
+a clear value proposition
+relevant context
+appropriate CTA
+professional language
+Safety and policy
+
+The message should not contain inappropriate or deceptive claims.
+
+The Guardrail Agent returns a structured validation result.
+
+Example:
+
+{
+  "passed": false,
+  "issues": [
+    {
+      "type": "unsupported_claim",
+      "severity": "high",
+      "text": "..."
+    }
+  ]
+}
+11. Self-Correction Loop
+
+The system contains one controlled self-correction loop.
+
+Draft
+  │
+  ▼
+Guardrail
+  │
+  ├── PASS ──► READY
+  │
+  └── FAIL
+        │
+        ▼
+   Self-Correction
+        │
+        ▼
+      Draft
+        │
+        ▼
+    Guardrail
+        │
+        ├── PASS ──► READY
+        │
+        └── FAIL ──► FAILED
+
+The loop is deliberately limited to one correction cycle.
+
+This prevents uncontrolled agent recursion and makes execution behavior predictable.
+
+12. LangGraph State
+
+The workflow uses a shared state object.
+
+Conceptually:
+
+class SDRState:
+    lead_id: str
+    company_name: str
+    company_domain: str
+
+    research: dict | None
+    score: dict | None
+
+    rejected: bool
+    rejection_reason: str | None
+
+    draft: dict | None
+    guardrail: dict | None
+
+    correction_count: int
+
+    status: str
+    error: str | None
+
+LangGraph nodes update this state as the workflow progresses.
+
+The state makes the workflow explicit and observable.
+
+13. LLM Provider Architecture
+
+The application uses Google Gemini through its OpenAI-compatible API endpoint.
+
+The provider configuration is isolated inside the application configuration layer.
+
+Application
+     │
+     ▼
+Agent
+     │
+     ▼
+OpenAI-compatible SDK
+     │
+     ▼
+Google Gemini OpenAI-compatible endpoint
+     │
+     ▼
+gemini-2.5-flash
+
+Current configuration:
+
+Provider:
+Google Gemini
+
+Model:
+gemini-2.5-flash
+
+Endpoint:
+https://generativelanguage.googleapis.com/v1beta/openai/
+
+The application does not hard-code provider configuration inside individual business workflows.
+
+This makes future provider/model changes easier without redesigning the agent architecture.
+
+14. Configuration Management
+
+Environment variables are used for secrets and deployment-specific configuration.
+
+Example:
+
+GEMINI_API_KEY=
+DATABASE_URL=
+JWT_SECRET_KEY=
+
+Application code reads these values through the configuration layer.
+
+Secrets are never committed to Git.
+
+The real .env file remains local and is excluded through .gitignore.
+
+A safe .env.example contains placeholders only.
+
+Example:
+
+GEMINI_API_KEY=your_gemini_api_key_here
+DATABASE_URL=postgresql://user:password@localhost:5432/ai_sdr
+JWT_SECRET_KEY=replace_with_a_secure_secret
+15. Authentication Architecture
+
+The API uses JWT-based authentication.
+
+User
+ │
+ ▼
+Login
+ │
+ ▼
+FastAPI
+ │
+ ▼
+Credential Validation
+ │
+ ▼
+JWT Token
+ │
+ ▼
+Protected API Requests
+
+Protected endpoints validate the JWT before accessing user-specific resources.
+
+Authentication responsibilities include:
+
+User registration
+Login
+Password hashing
+JWT generation
+JWT validation
+Protected routes
+User ownership checks
+
+Passwords are never stored in plaintext.
+
+16. Database Architecture
+
+PostgreSQL is the production database.
+
+Core entities include:
+
+User
+ │
+ ├── Leads
+ │
+ └── Runs
+       │
+       ├── Research result
+       ├── Scoring result
+       ├── Draft result
+       └── Guardrail result
+
+The database stores persistent application state rather than temporary workflow-only state.
+
+SQLAlchemy provides ORM functionality.
+
+Alembic manages schema migrations.
+
+17. API Architecture
+
+The FastAPI layer exposes REST endpoints.
+
+Typical endpoint groups:
+
+/auth
+/leads
+/runs
+/health
+
+Example flow:
+
+POST /auth/register
+POST /auth/login
+
+POST /leads
+GET  /leads
+
+POST /runs
+GET  /runs/{run_id}
+
+GET /health
+
+The API layer is responsible for:
+
+Request validation
+Authentication
+Authorization
+Calling application services/workflows
+Returning structured responses
+Error handling
+
+The API should not contain complex agent orchestration logic directly.
+
+18. Tool Architecture
+
+Agents can access bounded external tools.
+
+Current tools include:
+
+Web Search
+Page Fetch
+Web Search
+
+Used to discover relevant public information.
+
+Responsibilities:
+
+Search public web sources
+Return search results
+Preserve URLs
+Bound the amount of retrieved information
+Page Fetch
+
+Used to retrieve content from selected URLs.
+
+Responsibilities:
+
+Fetch public pages
+Extract useful text
+Limit content size
+Handle request failures
+Avoid uncontrolled content retrieval
+
+Tools are kept separate from agents so they can be tested independently.
+
+19. Tool Safety
+
+External web content is treated as untrusted input.
+
+The system should:
+
+Limit request sizes
+Limit fetched content
+Apply timeouts
+Handle failures
+Avoid executing arbitrary page content
+Keep retrieved content separate from system instructions
+Preserve source URLs for traceability
+
+The research process should prefer evidence-backed claims rather than blindly trusting generated text.
+
+20. Error Handling
+
+Errors are represented explicitly throughout the system.
+
+Typical failure categories:
+
+AuthenticationError
+ValidationError
+DatabaseError
+ToolError
+LLMError
+WorkflowError
+
+The API returns appropriate HTTP responses rather than exposing internal stack traces.
+
+LLM/API failures should be captured and converted into controlled workflow failures.
+
+Example:
+
+LLM request fails
+       │
+       ▼
+Agent captures error
+       │
+       ▼
+Workflow records failure
+       │
+       ▼
+API returns controlled response
+21. Observability
+
+Each lead run should have a traceable lifecycle.
+
+Example:
+
+run_id
+lead_id
+status
+current_stage
+started_at
+completed_at
+error
+
+Agent outputs should be persisted sufficiently to diagnose failures and evaluate system quality.
+
+Important metrics include:
+
+Research success rate
+Scoring success rate
+Reject rate
+Draft success rate
+Guardrail pass rate
+Self-correction rate
+Final ready rate
+Workflow failure rate
+LLM usage per lead run
+Average execution time
+22. Evaluation Strategy
+
+The project includes a synthetic evaluation harness.
+
+The evaluation dataset contains representative companies and expected outcomes.
+
+Evaluation dimensions include:
+
+Research quality
+Relevant facts retrieved
+Source quality
+Missing information
+Hallucination rate
+Scoring quality
+ICP alignment
+Score consistency
+Explanation quality
+Draft quality
+Personalization
+Relevance
+Clarity
+CTA quality
+Unsupported claims
+Guardrail quality
+Correctly detects unsupported claims
+Correctly accepts valid drafts
+Produces useful failure reasons
+Workflow quality
+Correct routing
+Correct rejection behavior
+Correct self-correction behavior
+No uncontrolled recursion
+23. Evaluation Dataset
+
+The synthetic evaluation harness should contain cases such as:
+
+Strong ICP fit
+Medium ICP fit
+Poor ICP fit
+Insufficient research
+Conflicting evidence
+Unsupported personalization
+Valid personalized draft
+Guardrail failure
+Self-correction success
+Self-correction failure
+
+This allows the system to be tested beyond simple unit tests.
+
+24. Testing Strategy
+
+The project uses multiple testing layers.
+
+Unit Tests
+
+Test individual functions and components.
+
+Examples:
+
+Configuration
+Pricing/usage handling
+Authentication
+Repositories
+Tools
+Agents
+Schemas
+Integration Tests
+
+Test interactions between:
+
+API
+Database
+Workflow
+Agents
+Workflow Tests
+
+Validate:
+
+Research → Score
+Score → Reject
+Score → Draft
+Draft → Guardrail
+Guardrail → Self-Correction
+Guardrail → Ready
+End-to-End Tests
+
+Validate the complete application flow.
+
+25. Code Quality
+
+Ruff is used for linting and code quality checks.
+
+The CI pipeline should run:
+
+ruff check src tests
+pytest
+
+A successful CI run should provide confidence that the repository is syntactically valid, lint-clean, and passing automated tests.
+
+26. CI/CD Architecture
+
+GitHub Actions provides automated validation.
+
+Developer
+   │
+   ▼
+Git Push
+   │
+   ▼
+GitHub
+   │
+   ▼
+GitHub Actions
+   │
+   ├── Install dependencies
+   │
+   ├── Ruff
+   │
+   ├── Pytest
+   │
+   └── Build/validation
+
+Deployment should only proceed after required checks pass.
+
+27. Docker Architecture
+
+Docker provides a reproducible backend runtime.
+
+Conceptually:
+
+Docker Image
+    │
+    ├── Python runtime
+    ├── Application dependencies
+    ├── Backend source
+    └── Startup configuration
+
+The application is configured through environment variables at runtime.
+
+Secrets are not baked into the Docker image.
+
+28. Deployment Architecture
+
+Production deployment is split between frontend and backend.
+
+                         Internet
+                            │
+             ┌──────────────┴──────────────┐
+             │                             │
+             ▼                             ▼
+        Vercel                         Render
+      React Frontend                 FastAPI Backend
+                                           │
+                                           ▼
+                                      PostgreSQL
+                                           │
+                                           ▼
+                                     Google Gemini
+
+The frontend communicates with the backend API.
+
+The backend communicates with PostgreSQL and Google Gemini.
+
+Database credentials and Gemini credentials remain server-side.
+
+29. Environment Separation
+
+The system should distinguish between local development and production configuration.
+
+Local
+localhost
+local PostgreSQL
+local environment variables
+development frontend
+Production
+Render
+managed PostgreSQL
+production environment variables
+Vercel frontend
+Google Gemini API
+
+Production secrets are configured through the deployment platform rather than committed to the repository.
+
+30. Security Model
+
+Security controls include:
+
+Secrets
+Never commit .env
+Never expose API keys in frontend code
+Never hard-code secrets
+Use deployment environment variables
+Authentication
+Hash passwords
+Use signed JWT tokens
+Validate authentication on protected routes
+Authorization
+
+Users should only access resources they own.
+
+External tools
+Apply request timeouts
+Bound content
+Treat external content as untrusted
+LLM output
+
+Generated content is validated before being considered ready.
+
+31. Data Flow
+
+A complete lead run looks like this:
+
+1. User creates lead
+        │
+        ▼
+2. API validates request
+        │
+        ▼
+3. Lead stored in PostgreSQL
+        │
+        ▼
+4. LangGraph run starts
+        │
+        ▼
+5. Research Agent
+        │
+        ├── Web Search
+        └── Page Fetch
+        │
+        ▼
+6. Research result stored
+        │
+        ▼
+7. Scoring Agent
+        │
+        ▼
+8. ICP Gate
+        │
+        ├── Reject → END
+        │
+        ▼
+9. Drafting Agent
+        │
+        ▼
+10. Guardrail Agent
+        │
+        ├── PASS → READY
+        │
+        └── FAIL
+              │
               ▼
-     ┌─────────────────┐
-     │ Scoring Agent    │  input: LeadProfile + ICP config
-     │ → ScoreResult    │  output: score 0-100, reasoning, confidence
-     └────────┬─────────┘
-       score ≥ threshold?
+        11. Self-Correction
+              │
               ▼
-     ┌─────────────────┐
-     │ Drafting Agent   │  input: LeadProfile + ScoreResult
-     │ → OutreachDraft  │  output: personalized message referencing real signals
-     └────────┬─────────┘
-              ▼
-     ┌─────────────────┐
-     │ Guardrail Agent  │  checks: every claim in draft traces back to LeadProfile
-     │ → Approved/Flag  │  (LLM-as-judge pattern — standard production practice)
-     └────────┬─────────┘
-              ▼
-        Persist to DB → expose via API
-```
+        12. Guardrail
+              │
+              ├── PASS → READY
+              │
+              └── FAIL → FAILED
+32. Failure Strategy
 
-**Why 4 specialized agents instead of 1 mega-prompt:** this is the core differentiator vs. typical single-agent portfolio projects. Each agent has one job, one tool set, one structured output schema — easier to test, evaluate, and reason about independently. It also lets us swap/upgrade one agent without touching others (e.g., swap the Research Agent's search tool later).
+The system is designed to fail safely.
 
-**Why a Guardrail Agent specifically:** hallucination is the #1 production risk in agentic systems. An explicit fact-checking step (comparing draft claims against the source LeadProfile) is exactly the kind of "I thought about production safety" detail that separates a portfolio project from a toy demo.
+Research failure
+Research unavailable
+       │
+       ▼
+Run marked failed
+Scoring failure
+Research exists
+       │
+       ▼
+Scoring fails
+       │
+       ▼
+Run marked failed
+Low ICP score
+Score below threshold
+       │
+       ▼
+Reject lead
+       │
+       ▼
+No drafting
+Guardrail failure
+Draft fails validation
+       │
+       ▼
+One self-correction attempt
+       │
+       ├── Pass → Ready
+       │
+       └── Fail → Failed
 
----
+This provides deterministic limits around agent behavior.
 
-## 4. Tech Stack (and why)
+33. Cost and Usage Control
 
-| Layer | Choice | Reasoning |
-|---|---|---|
-| Backend API | FastAPI | Industry standard for AI Engineer roles; async, auto-generated OpenAPI docs, Pydantic-native (matches our structured agent I/O) |
-| Agent orchestration | Hand-rolled state machine first → refactor to LangGraph | We build it by hand initially so you understand the tool-calling loop and state transitions at a low level (interview-relevant), then refactor to LangGraph as a documented improvement — LangGraph is what most companies actually use in production |
-| LLM | Anthropic Claude API (you have credits) — **tiered model use**: Claude Haiku 4.5 for Research/Scoring Agents (high call volume, needs speed/cost efficiency), Claude Sonnet 5 for Drafting/Guardrail Agents (higher-stakes, quality-sensitive output) | Tiered model selection by task cost/risk is a real production cost-optimization pattern — using one expensive model for everything is a common junior mistake and a good interview talking point |
-| Web search tool | `duckduckgo-search` (free, no key) with Tavily documented as a "prod upgrade" | Keeps dev cost at $0 while still demonstrating tool-use design |
-| Database | PostgreSQL (Docker) via SQLAlchemy + Alembic | Relational fits lead/score/draft/log data well; matches what's used in real backend teams |
-| Auth | JWT via FastAPI OAuth2PasswordBearer | Multi-user (sales team) access is realistic for this product |
-| Logging | Structured JSON logging (every agent decision persisted, not just printed) | This *is* your explainability layer for an agentic system |
-| Testing | pytest with mocked LLM/tool responses | Deterministic tests are non-negotiable for agent systems — real interviewers ask about this |
-| Containerization | Docker + docker-compose (api + postgres) | Standard requirement, low effort given API-only workload |
-| CI/CD | GitHub Actions (lint, test, build) | Signals engineering maturity beyond "it runs on my machine" |
-| Deployment | Render or Railway (free/cheap tier, Docker + managed Postgres) | No GPU needed anywhere in this stack, so free-tier hosting is genuinely sufficient |
-| Frontend | React + Vite + TypeScript, hand-written CSS, `react-router-dom` | Lightweight dashboard (leads list/create, lead detail, agent trace viewer) kept out of MVP scope until the agent quality itself was solid — built in Milestone 13 against the finished API, not alongside a moving backend |
+The system reduces unnecessary LLM usage through workflow gating.
 
----
+The primary optimization is:
 
-## 5. Folder Structure (industry `src` layout)
+Research
+   ↓
+Score
+   ↓
+Reject bad leads early
+   ↓
+Draft only qualified leads
+   ↓
+Guardrail
+   ↓
+One correction maximum
 
-```
-AI-SDR-Architecture/
-├── src/
-│   ├── api/              # FastAPI route handlers
-│   ├── agents/           # research_agent.py, scoring_agent.py, drafting_agent.py, guardrail_agent.py, orchestrator.py
-│   ├── tools/             # web_search.py, page_fetch.py
-│   ├── core/              # config.py, security.py, logging.py
-│   ├── db/                # models.py, session.py, migrations/
-│   ├── schemas/           # Pydantic: LeadProfile, ScoreResult, OutreachDraft
-│   ├── services/          # ties agents + db together
-│   └── main.py
-├── tests/
-├── frontend/               # React + Vite + TS dashboard (Milestone 13)
-│   └── src/
-│       ├── pages/          # LoginPage, LeadsPage, LeadDetailPage
-│       ├── components/     # StatusBadge, ProtectedRoute
-│       ├── api.ts          # typed fetch client
-│       └── auth.tsx        # JWT auth context
-├── docker/
-│   ├── Dockerfile
-│   └── docker-compose.yml
-├── .github/workflows/ci.yml
-├── docs/
-│   ├── architecture.md    # this file, evolved
-│   ├── architecture-diagram.svg
-│   ├── milestone10-langgraph-refactor.md
-│   ├── deployment.md
-│   └── demo.md
-├── render.yaml            # Render Blueprint (Milestone 14)
-├── .env.example
-├── pyproject.toml
-├── README.md
-└── .gitignore
-```
+This prevents every lead from automatically reaching every agent.
 
----
+The project intentionally avoids hard-coding unverified provider pricing into the architecture documentation.
 
-## 6. Evaluation Plan
+Actual usage/cost reporting should be based on verified provider pricing and the application's measured token usage.
 
-- Build a small hand-labeled eval set: ~25 mock companies with human-assigned "good fit / bad fit" labels against a defined ICP.
-- Measure Scoring Agent agreement with human labels (precision/recall, not just accuracy — false positives are costly in real SDR workflows).
-- Use an LLM-as-judge pass on Drafting Agent output to flag ungrounded claims (cross-referenced against Guardrail Agent's own output, as a sanity check on the sanity checker).
-- Track latency and cost per lead run — production AI engineers are expected to reason about both, not just correctness.
+34. Scalability Considerations
 
----
+The initial architecture is designed for a small production workload.
 
-## 7. 14-Day Milestone Plan
+Potential future improvements include:
 
-1. **Problem definition + architecture design** ✅
-2. **Repo scaffolding, DB schema, core config** ✅
-3. **Research Agent + web search/scrape tools** ✅
-4. **Scoring Agent (structured output, ICP config)** ✅
-5. **Drafting Agent + Guardrail Agent** ✅
-6. **Orchestrator (hand-rolled state machine)** ✅
-7. **FastAPI endpoints + JWT auth** ✅
-8. **Logging + evaluation harness + eval dataset** ✅
-9. **Testing (unit + integration, mocked LLM)** ✅
-10. **Refactor orchestration to LangGraph (documented before/after comparison)** ✅
-11. **Docker + docker-compose** ✅ (Dockerfile/compose statically verified in-sandbox — no Docker daemon available there; real build/run verification landed in Milestone 12's CI, see below)
-12. **CI/CD (GitHub Actions)** ✅
-13. **Frontend dashboard (React + Vite + TS)** ✅
-14. **Deployment (Render Blueprint), final README, architecture diagram, demo walkthrough, future-improvements doc** ✅ — Phase 1 complete
+Async job processing
 
----
+Move long-running agent runs into a worker queue.
 
-## 8. Finalized Decisions
+Possible architecture:
 
-**LLM provider:** Anthropic Claude API (Haiku 4.5 for Research/Scoring, Sonnet 5 for Drafting/Guardrail — see tiering rationale in Section 4).
+FastAPI
+   │
+   ▼
+Job Queue
+   │
+   ▼
+Worker
+   │
+   ▼
+LangGraph
+Caching
 
-**ICP definition:** *AI-native B2B companies* — startups/scale-ups building AI products or adopting AI infrastructure (AI dev tools, agent platforms, MLOps, applied-AI SaaS). Chosen deliberately because:
+Cache:
 
-- It's the single fastest-growing B2B buying category right now, meaning genuinely available, timely signal data to research (funding announcements, hiring for AI roles, product launches).
-- It makes the project self-referential in a way that reads well in interviews: *"I built an AI SDR that sells to AI companies"* is a memorable, on-thesis pitch, not a generic "sells to any SaaS company" demo.
-- Concrete scoring signals we'll extract: recent AI-related funding/press, job postings mentioning ML/AI engineer roles, product pages mentioning "AI," "agent," "LLM," "copilot," GitHub/tech presence indicating an engineering-heavy team.
+Company research
+Search results
+Page content
+Rate limiting
 
-Eval set (Milestone 8) will be ~25 real or realistic AI-native companies hand-labeled against this ICP.
+Control:
 
----
+API requests
+Web requests
+LLM requests
+Horizontal scaling
 
-## 9. Future Improvements (post-MVP, good interview talking points)
+Multiple backend/worker instances can process independent lead runs.
 
-**Product scope, deliberately deferred:**
-- Real email/CRM integration (Gmail API, HubSpot/Salesforce)
-- Multi-tenant support with per-org ICP configs
-- Swap DuckDuckGo for a paid enrichment API (Clearbit/Apollo) for higher-quality signals
-- Human-in-the-loop approval queue in the frontend before any draft is marked "ready to send"
+35. Reliability Considerations
 
-**Now built, noted here for history:** a cost/latency dashboard per agent
-run was originally listed as a future improvement — Milestone 13 built it
-(the `AgentLog` audit table + the dashboard's agent trace viewer,
-`GET /leads/{id}/logs`). What's still missing is aggregation *across* leads
-(e.g. total spend this week) — currently you can only see cost/latency for
-one lead at a time.
+The architecture avoids uncontrolled autonomous behavior.
 
-**Engineering tradeoffs made explicitly during the build, consolidated
-here from inline code comments so they're in one place:**
+Reliability mechanisms include:
 
-- **Synchronous pipeline execution** (`src/api/leads.py`) — `POST /leads`
-  blocks the request until all four agents finish (~30s). Fine for a
-  single-user demo; a background task queue (Celery/RQ/arq) is the correct
-  fix once this needs to serve concurrent users, returning a `202` +
-  lead ID immediately and letting the client poll or receive a webhook.
-- **JWT stored in `localStorage`, not an httpOnly cookie**
-  (`frontend/src/auth.tsx`) — simpler to wire up, but XSS-exposed (any
-  script that runs on the page can read it). The correct fix is the
-  backend setting an httpOnly, Secure, SameSite cookie on login instead of
-  returning the token in a JSON body, which requires a CORS/cookie rework
-  on the FastAPI side.
-- **Docker layer caching is not fully optimized** (`docker/Dockerfile`) —
-  `pip install .` on a src-layout package needs the actual source present,
-  so the classic "copy dependency file, install, then copy source" caching
-  trick doesn't cleanly apply here. The fix is a pip-compile'd,
-  dependencies-only `requirements.txt` installed before the source is
-  copied — deferred to avoid adding a new tool/process for a
-  portfolio-stage build.
-- **Frontend types are hand-mirrored, not generated**
-  (`frontend/src/types.ts`) — a hand-written copy of the Pydantic schemas
-  in `src/schemas/`, which can silently drift if a backend field is
-  renamed. Generating them from the FastAPI OpenAPI schema (e.g.
-  `openapi-typescript`) removes that drift risk; not worth the extra build
-  step for a single-developer project yet.
-- **`GET /leads` pagination has no upper bound on `limit`** — a client can
-  request `?limit=999999` and get every row back in one response. Low risk
-  at current scale, but a real API should cap it server-side (e.g. 200) and
-  return `422` above that, not just document it.
-- **No API rate limiting** — the auth layer prevents unauthenticated
-  access but nothing currently throttles a single authenticated user
-  hammering `POST /leads` (each call costs real LLM spend). A per-user
-  rate limit (e.g. `slowapi`) is a reasonable next step before this is
-  exposed beyond a personal demo.
-- **Render's free Postgres expires 30 days after creation** (see
-  `docs/deployment.md`) — fine for a portfolio project you actively
-  maintain, not a real persistence guarantee. Upgrading just the database
-  tier removes this without needing paid compute.
+Explicit LangGraph transitions
+Typed state
+Early rejection
+Bounded tool access
+One self-correction loop
+Persistent run state
+Controlled errors
+Automated testing
+CI validation
+
+The system therefore behaves more like a controlled workflow engine than an unconstrained autonomous agent.
+
+36. Design Principles
+Separation of concerns
+
+Each component has a clear responsibility.
+
+Explicit orchestration
+
+The workflow is represented explicitly through LangGraph.
+
+Evidence before generation
+
+Research occurs before scoring and drafting.
+
+Independent verification
+
+The Guardrail Agent independently validates generated outreach.
+
+Fail fast
+
+Poor-fit leads are rejected before expensive downstream processing.
+
+Bounded autonomy
+
+The self-correction mechanism has a fixed limit.
+
+Configuration over hard-coding
+
+ICP thresholds, provider configuration, and environment-specific settings are configurable.
+
+Production readiness
+
+Authentication, persistence, migrations, testing, CI/CD, Docker, deployment, and security are part of the architecture rather than afterthoughts.
+
+37. Current Architecture Decision
+
+The current production architecture uses:
+
+Frontend:
+React + Vite + TypeScript + Tailwind CSS
+
+Backend:
+FastAPI
+
+Agent Orchestration:
+LangGraph
+
+Database:
+PostgreSQL
+
+ORM:
+SQLAlchemy
+
+Migrations:
+Alembic
+
+Authentication:
+JWT
+
+LLM Provider:
+Google Gemini
+
+LLM Model:
+gemini-2.5-flash
+
+LLM Access:
+OpenAI-compatible Gemini API endpoint
+
+Tools:
+Web Search + Page Fetch
+
+Testing:
+Pytest
+
+Linting:
+Ruff
+
+Containerization:
+Docker
+
+CI:
+GitHub Actions
+
+Backend Deployment:
+Render
+
+Frontend Deployment:
+Vercel
+
+The overall architecture is intentionally provider-isolated so the LLM provider or model can be changed later without redesigning the agent workflow.
+
+38. Final Architecture Summary
+
+The AI SDR is a controlled, evidence-driven multi-agent system.
+
+The complete architecture is:
+
+                         USER
+                          │
+                          ▼
+                 ┌─────────────────┐
+                 │   React/Vite UI │
+                 └────────┬────────┘
+                          │
+                          ▼
+                 ┌─────────────────┐
+                 │     FastAPI     │
+                 │   JWT Auth      │
+                 └────────┬────────┘
+                          │
+                          ▼
+                 ┌─────────────────┐
+                 │    LangGraph    │
+                 │   Orchestrator  │
+                 └────────┬────────┘
+                          │
+             ┌────────────┼─────────────┐
+             │            │             │
+             ▼            ▼             ▼
+        Research       Scoring        Drafting
+          Agent         Agent          Agent
+             │            │             │
+             ▼            ▼             ▼
+        Web Search    ICP Evaluation   Guardrail
+        Page Fetch          │             │
+                            │             ▼
+                            │       Self-Correction
+                            │             │
+                            └─────────────┘
+                                  │
+                                  ▼
+                                READY
+                                  │
+                                  ▼
+                            PostgreSQL
+
+                                  │
+                                  ▼
+                         Google Gemini API
+                         gemini-2.5-flash
+
+The system demonstrates the core capabilities expected from a production-oriented AI engineering project:
+
+Multi-agent orchestration
+Structured state management
+LLM integration
+Tool calling
+Evidence-based research
+Configurable ICP scoring
+Early rejection
+Personalized generation
+Independent guardrails
+Controlled self-correction
+Authentication
+PostgreSQL persistence
+API design
+Docker
+CI/CD
+Automated testing
+Evaluation
+Production deployment
+Security-conscious configuration
+
+The architecture is designed to be understandable, testable, observable, and extensible while keeping the autonomous behavior bounded and predictable.

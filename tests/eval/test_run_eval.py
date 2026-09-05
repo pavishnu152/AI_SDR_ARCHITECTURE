@@ -40,7 +40,7 @@ def _fake_score_result(score: int) -> ScoringAgentResult:
     return ScoringAgentResult(
         success=True,
         output=ScoreOutput(score=score, confidence=0.8, reasoning="fake"),
-        model="claude-haiku-4-5-20251001",
+        model="openai/gpt-oss-20b",
         latency_ms=100,
         input_tokens=200,
         output_tokens=50,
@@ -145,7 +145,7 @@ def test_run_eval_excludes_agent_failures_from_agreement_rate():
     def fake_score_fn(research, icp_arg):
         if "Broken" in research.summary:
             return ScoringAgentResult(
-                success=False, output=None, model="claude-haiku-4-5-20251001",
+                success=False, output=None, model="openai/gpt-oss-20b",
                 latency_ms=50, error="LLM call failed: timeout",
             )
         return _fake_score_result(85)

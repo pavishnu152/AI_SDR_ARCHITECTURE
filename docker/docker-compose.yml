@@ -4,7 +4,7 @@
 #   docker compose -f docker/docker-compose.yml up --build
 #
 # Requires a .env file at the project root (copy .env.example -> .env and
-# fill in ANTHROPIC_API_KEY) — env_file below loads it for the api service.
+# fill in GEMINI_API_KEY) — env_file below loads it for the api service.
 
 services:
   postgres:

@@ -1,9 +1,10 @@
 """Mocked tests for the Drafting Agent. No real API calls."""
+import json
 from dataclasses import dataclass
 from unittest.mock import MagicMock
 
-import anthropic
 import httpx
+import openai
 import pytest
 
 from src.agents.drafting_agent import draft_outreach
@@ -11,16 +12,35 @@ from src.schemas.lead import ResearchOutput, ScoreOutput, Signal
 
 
 @dataclass
-class FakeBlock:
-    type: str
-    id: str = ""
-    name: str = ""
-    input: dict = None
+class FakeFunction:
+    name: str
+    arguments: str
+
+
+@dataclass
+class FakeToolCall:
+    id: str
+    function: FakeFunction
+
+
+@dataclass
+class FakeMessage:
+    content: str | None = None
+    tool_calls: list | None = None
+
+
+@dataclass
+class FakeChoice:
+    message: FakeMessage
 
 
 @dataclass
 class FakeResponse:
-    content: list
+    choices: list
+
+
+def _tool_call(call_id: str, name: str, payload: dict) -> FakeToolCall:
+    return FakeToolCall(id=call_id, function=FakeFunction(name=name, arguments=json.dumps(payload)))
 
 
 @pytest.fixture
@@ -45,24 +65,29 @@ def sample_score():
 
 def test_draft_outreach_happy_path(sample_research, sample_score):
     fake_response = FakeResponse(
-        content=[
-            FakeBlock(
-                type="tool_use",
-                id="tu_1",
-                name="submit_draft",
-                input={
-                    "channel": "email",
-                    "message": (
-                        "Hi Acme AI team, congrats on the $12M Series A. Curious if you're "
-                        "exploring AI-native tools for outbound — worth a quick chat? "
-                        "— The AI SDR team"
-                    ),
-                },
+        choices=[
+            FakeChoice(
+                message=FakeMessage(
+                    tool_calls=[
+                        _tool_call(
+                            "tu_1",
+                            "submit_draft",
+                            {
+                                "channel": "email",
+                                "message": (
+                                    "Hi Acme AI team, congrats on the $12M Series A. Curious if "
+                                    "you're exploring AI-native tools for outbound — worth a "
+                                    "quick chat? — The AI SDR team"
+                                ),
+                            },
+                        )
+                    ]
+                )
             )
         ]
     )
     client = MagicMock()
-    client.messages.create.return_value = fake_response
+    client.chat.completions.create.return_value = fake_response
 
     result = draft_outreach("Acme AI", sample_research, sample_score, client=client)
 
@@ -70,13 +95,15 @@ def test_draft_outreach_happy_path(sample_research, sample_score):
     assert result.output.channel == "email"
     assert len(result.output.message) > 0
 
-    _, kwargs = client.messages.create.call_args
-    assert kwargs["tool_choice"] == {"type": "tool", "name": "submit_draft"}
+    _, kwargs = client.chat.completions.create.call_args
+    assert kwargs["tool_choice"] == {"type": "function", "function": {"name": "submit_draft"}}
 
 
 def test_draft_outreach_handles_missing_tool_use_block(sample_research, sample_score):
     client = MagicMock()
-    client.messages.create.return_value = FakeResponse(content=[])
+    client.chat.completions.create.return_value = FakeResponse(
+        choices=[FakeChoice(message=FakeMessage(tool_calls=[]))]
+    )
 
     result = draft_outreach("Acme AI", sample_research, sample_score, client=client)
 
@@ -86,8 +113,8 @@ def test_draft_outreach_handles_missing_tool_use_block(sample_research, sample_s
 
 def test_draft_outreach_handles_api_error(sample_research, sample_score):
     client = MagicMock()
-    client.messages.create.side_effect = anthropic.APIConnectionError(
-        request=httpx.Request("POST", "https://api.anthropic.com/v1/messages")
+    client.chat.completions.create.side_effect = openai.APIConnectionError(
+        request=httpx.Request("POST", "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions")
     )
 
     result = draft_outreach("Acme AI", sample_research, sample_score, client=client)
@@ -99,9 +126,13 @@ def test_draft_outreach_handles_api_error(sample_research, sample_score):
 def test_draft_outreach_handles_invalid_payload(sample_research, sample_score):
     # Missing the required "message" key — DraftOutput validation must fail.
     client = MagicMock()
-    client.messages.create.return_value = FakeResponse(
-        content=[
-            FakeBlock(type="tool_use", id="tu_1", name="submit_draft", input={"channel": "email"})
+    client.chat.completions.create.return_value = FakeResponse(
+        choices=[
+            FakeChoice(
+                message=FakeMessage(
+                    tool_calls=[_tool_call("tu_1", "submit_draft", {"channel": "email"})]
+                )
+            )
         ]
     )
 
@@ -120,11 +151,17 @@ def test_draft_outreach_includes_guardrail_feedback_in_revision_prompt(
     never actually execute the guardrail_feedback branch of _format_prompt.
     """
     client = MagicMock()
-    client.messages.create.return_value = FakeResponse(
-        content=[
-            FakeBlock(
-                type="tool_use", id="tu_1", name="submit_draft",
-                input={"channel": "email", "message": "revised message"},
+    client.chat.completions.create.return_value = FakeResponse(
+        choices=[
+            FakeChoice(
+                message=FakeMessage(
+                    tool_calls=[
+                        _tool_call(
+                            "tu_1", "submit_draft",
+                            {"channel": "email", "message": "revised message"},
+                        )
+                    ]
+                )
             )
         ]
     )
@@ -134,6 +171,6 @@ def test_draft_outreach_includes_guardrail_feedback_in_revision_prompt(
         guardrail_feedback=["$50M Series C (unsupported)"],
     )
 
-    sent_prompt = client.messages.create.call_args.kwargs["messages"][0]["content"]
+    sent_prompt = client.chat.completions.create.call_args.kwargs["messages"][1]["content"]
     assert "$50M Series C (unsupported)" in sent_prompt
     assert "previous draft was rejected" in sent_prompt.lower()

@@ -21,7 +21,7 @@ from datetime import datetime, timedelta, timezone
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
-from src.core.config import get_settings
+from src.core.config import settings
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -35,18 +35,18 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 
 def create_access_token(subject: str) -> str:
-    settings = get_settings()
-    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.jwt_expire_minutes)
+    config = settings()
+    expire = datetime.now(timezone.utc) + timedelta(minutes=config.jwt_expire_minutes)
     payload = {"sub": subject, "exp": expire}
-    return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+    return jwt.encode(payload, config.jwt_secret_key, algorithm=config.jwt_algorithm)
 
 
 def decode_access_token(token: str) -> str | None:
     """Returns the token's subject (user email) if valid, else None. Never
     raises — callers treat None as "not authenticated", not a crash."""
-    settings = get_settings()
+    config = settings()
     try:
-        payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
+        payload = jwt.decode(token, config.jwt_secret_key, algorithms=[config.jwt_algorithm])
         return payload.get("sub")
     except JWTError:
         return None
