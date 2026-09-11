@@ -11,7 +11,7 @@ from alembic import context
 # (matches how pyproject.toml's pytest config does the same thing).
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from src.core.config import get_settings  # noqa: E402
+from src.core.config import settings  # noqa: E402
 from src.db.models import Base  # noqa: E402
 
 # this is the Alembic Config object, which provides
@@ -34,7 +34,7 @@ target_metadata = Base.metadata
 # `alembic upgrade head` connect to whatever DATABASE_URL the app itself
 # would use, in every environment (local dev, Docker, CI) without editing
 # alembic.ini per environment.
-config.set_main_option("sqlalchemy.url", get_settings().database_url)
+config.set_main_option("sqlalchemy.url", settings().database_url)
 
 
 def run_migrations_offline() -> None:
