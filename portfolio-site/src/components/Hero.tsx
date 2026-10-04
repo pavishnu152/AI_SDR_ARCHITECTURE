@@ -48,13 +48,6 @@ export function Hero() {
               View AI SDR →
             </a>
             <a
-              href={profile.resumeFile}
-              download
-              className="px-5 py-3 border border-border-strong hover:border-accent transition-colors"
-            >
-              ↓ Resume
-            </a>
-            <a
               href={profile.github}
               target="_blank"
               rel="noreferrer"

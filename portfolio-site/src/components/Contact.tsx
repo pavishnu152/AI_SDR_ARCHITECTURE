@@ -27,9 +27,6 @@ export function Contact() {
           <a href={profile.linkedin} target="_blank" rel="noreferrer" className="flex items-center justify-between border-b border-border py-3 hover:text-accent transition-colors">
             LinkedIn <span>↗</span>
           </a>
-          <a href={profile.resumeFile} download className="flex items-center justify-between border-b border-border py-3 hover:text-accent transition-colors">
-            Resume (PDF) <span>↓</span>
-          </a>
           <a href={`tel:${profile.phone}`} className="flex items-center justify-between border-b border-border py-3 hover:text-accent transition-colors">
             {profile.phone} <span>↗</span>
           </a>

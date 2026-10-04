@@ -1,29 +1,30 @@
-// All content sourced from the resume and the AI SDR project's own docs —
-// nothing fabricated. Update here once, reflected everywhere.
+// All content sourced from the resume and the AI SDR project's own docs.
+// Nothing fabricated. Update here once, reflected everywhere.
 
 export const profile = {
   name: "Pavishnu S",
   title: "AI/ML Engineer",
-  subtitle: "Building production multi-agent systems, RAG pipelines, and applied deep learning",
+  subtitle:
+    "Building production multi-agent systems, RAG pipelines, and applied deep learning",
   location: "Bangalore, Karnataka, India",
   email: "sspavishnu16@gmail.com",
   phone: "+91 81442 81008",
   github: "https://github.com/pavishnu152",
   linkedin: "https://linkedin.com/in/pavishnu152",
-  resumeFile: "/Pavishnu_Resume.pdf",
   summary:
     "B.Tech IT graduate (2026) who ships working AI systems, not notebooks. Four end-to-end projects spanning agentic pipelines, RAG, and applied deep learning — including a multi-agent system with a fail-closed guardrail and full per-call audit logging, and a CNN+BiGRU model at 96.39% accuracy.",
 };
 
 export const featuredProject = {
   name: "AI SDR",
-  tagline: "A 4-agent lead research and qualification pipeline with full decision traceability",
+  tagline:
+    "A 4-agent lead research and qualification pipeline with full decision traceability",
   description:
     "Given a company name, four coordinated agents autonomously research it, score it against a configurable Ideal Customer Profile, draft personalized outreach, and independently fact-check that draft before anything is marked ready to send. Every agent call — including failures and retries — is logged to an append-only audit table. Not a chatbot wrapper: a pipeline with a fail-closed guardrail and a real evaluation harness.",
   stack: [
     "FastAPI",
     "LangGraph",
-    "Google Gemini (gemini-2.5-flash)",
+    "Google Gemini (gemini-3.6-flash)",
     "PostgreSQL",
     "SQLAlchemy 2.0",
     "React",
@@ -33,19 +34,24 @@ export const featuredProject = {
   ],
   highlights: [
     {
-      label: "Tiered model use",
-      detail: "gemini-2.5-flash powers research, scoring, drafting, and guardrail validation through Google's OpenAI-compatible API endpoint.",
+      label: "Gemini-powered agents",
+      detail:
+        "Gemini 3.6 Flash powers research, scoring, drafting, and guardrail validation through Google's OpenAI-compatible API endpoint.",
+    },
     {
       label: "Fail-closed guardrail",
-      detail: "An LLM outage during the fact-check step results in a flagged lead for human review, never a silently-approved one.",
+      detail:
+        "An LLM outage during the fact-check step results in a flagged lead for human review, never a silently-approved one.",
     },
     {
       label: "Two orchestrators, compared",
-      detail: "Built as a hand-rolled state machine first, then refactored onto LangGraph — with the honest finding that the LangGraph version is more lines of code, documented and tested side by side.",
+      detail:
+        "Built as a hand-rolled state machine first, then refactored onto LangGraph — with the honest finding that the LangGraph version is more lines of code, documented and tested side by side.",
     },
     {
       label: "Real bug found via live testing",
-      detail: "A missing API key raised a client-side error that unit tests couldn't reach (they mock the client). A live smoke test caught it; fixed with a regression test, not just a patch.",
+      detail:
+        "A missing API key raised a client-side error that unit tests could not reach because they mock the client. A live smoke test caught it and the issue was fixed with a regression test.",
     },
   ],
   stats: [
@@ -54,8 +60,8 @@ export const featuredProject = {
     { value: "4", label: "coordinated agents" },
     { value: "1", label: "audit-logged decision at every step" },
   ],
-  demoUrl: "", // filled in once deployed — see docs/deployment.md
-  githubUrl: "", // filled in once pushed to GitHub
+  demoUrl: "",
+  githubUrl: "",
   diagramSrc: "/ai-sdr-architecture.svg",
 };
 
@@ -65,8 +71,16 @@ export const otherProjects = [
     metric: "92% answer relevance",
     description:
       "RAG pipeline over enterprise documents with citation-grounded responses (85%+ accuracy) and zero external API dependency — local Ollama inference cut response latency 35%. Modular FastAPI backend for ingestion, indexing, and real-time query handling.",
-    stack: ["Python", "FastAPI", "LangChain", "ChromaDB", "FAISS", "Ollama"],
-    githubUrl: "https://github.com/pavishnu152/Enterprise-Doc-Insight",
+    stack: [
+      "Python",
+      "FastAPI",
+      "LangChain",
+      "ChromaDB",
+      "FAISS",
+      "Ollama",
+    ],
+    githubUrl:
+      "https://github.com/pavishnu152/Enterprise-Doc-Insight",
   },
   {
     name: "AI Resume Analyzer",
@@ -74,7 +88,8 @@ export const otherProjects = [
     description:
       "Transformer-embedding semantic relevance scoring for ATS-style resume evaluation — 40% higher keyword recall than standard ATS keyword filtering. FastAPI backend, React frontend, structured skill-gap output.",
     stack: ["Python", "FastAPI", "React.js"],
-    githubUrl: "https://github.com/pavishnu152/AIRESUMEANALYZER",
+    githubUrl:
+      "https://github.com/pavishnu152/AIRESUMEANALYZER",
   },
   {
     name: "Parkinson's Disease Detection System",
@@ -82,7 +97,8 @@ export const otherProjects = [
     description:
       "Hybrid CNN+BiGRU deep learning model detecting Parkinson's from MRI scans — CNN extracts spatial features, BiGRU learns forward/backward feature relationships. Deployed as a Gradio app with automated PDF medical report generation.",
     stack: ["Python", "TensorFlow", "Keras", "Gradio"],
-    githubUrl: "https://github.com/pavishnu152/Parkinson-Disease-Prediction-System",
+    githubUrl:
+      "https://github.com/pavishnu152/Parkinson-Disease-Prediction-System",
   },
   {
     name: "ConvoLens AI",
@@ -90,15 +106,44 @@ export const otherProjects = [
     description:
       "Audio-to-text meeting assistant with real-time transcription, LLM-based summarization, and key-point extraction — eliminates manual meeting notes entirely, no technical setup required to use it.",
     stack: ["Python", "Streamlit", "AssemblyAI", "LM Studio"],
-    githubUrl: "https://github.com/pavishnu152/ConvoLens-AI",
+    githubUrl:
+      "https://github.com/pavishnu152/ConvoLens-AI",
   },
 ];
 
 export const skills = {
-  "Generative AI": ["RAG", "LangChain", "LangGraph", "ChromaDB", "FAISS", "Ollama", "Prompt Engineering", "Embeddings", "Semantic Search"],
-  "Machine Learning": ["Scikit-learn", "TensorFlow", "Keras", "CNN", "BiGRU", "Pandas", "NumPy", "Model Evaluation"],
-  "Backend / Systems": ["Python", "FastAPI", "SQL", "PostgreSQL", "SQLAlchemy", "REST APIs", "Docker", "CI/CD"],
-  "Frontend": ["React", "TypeScript", "Streamlit"],
+  "Generative AI": [
+    "RAG",
+    "LangChain",
+    "LangGraph",
+    "ChromaDB",
+    "FAISS",
+    "Ollama",
+    "Prompt Engineering",
+    "Embeddings",
+    "Semantic Search",
+  ],
+  "Machine Learning": [
+    "Scikit-learn",
+    "TensorFlow",
+    "Keras",
+    "CNN",
+    "BiGRU",
+    "Pandas",
+    "NumPy",
+    "Model Evaluation",
+  ],
+  "Backend / Systems": [
+    "Python",
+    "FastAPI",
+    "SQL",
+    "PostgreSQL",
+    "SQLAlchemy",
+    "REST APIs",
+    "Docker",
+    "CI/CD",
+  ],
+  Frontend: ["React", "TypeScript", "Streamlit"],
 };
 
 export const certifications = [

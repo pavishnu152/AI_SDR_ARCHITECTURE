@@ -53,6 +53,6 @@ src/
 │   └── SectionLabel.tsx    # numbered section header, reused everywhere
 public/
 ├── portrait.jpg           # professional photo, used in the hero
-├── Pavishnu_Resume.pdf    # downloadable resume
+    # downloadable resume
 └── ai-sdr-architecture.svg # copied from the AI SDR project's docs/
 ```
